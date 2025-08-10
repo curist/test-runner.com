@@ -19,6 +19,7 @@ test-runner/.lua/fennel.lua:
 artifacts/test-runner.com: artifacts/redbean.dev.com test-runner/.lua/fennel.lua test-runner/.fnl/redbean.fnl $(TEST_RUNNER_SRC)
 	cp $< redbean.com
 	cd test-runner && zip -r ../redbean.com .
+	zip -j redbean.com LICENSE
 	mv redbean.com $@ 
 
 test: artifacts/test-runner.com
