@@ -7,9 +7,9 @@
   (let [tests []]
     ;; Skip .git and other system directories
     (when (not (or (dir:match "%.git$")
-                 (dir:match "%.jj$")
-                 (dir:match "node_modules")
-                 (dir:match "artifacts")))
+                   (dir:match "%.jj$")
+                   (dir:match "node_modules")
+                   (dir:match "artifacts")))
       (each [name kind (rb.unix.opendir dir)]
         (let [path (.. dir "/" name)]
           (if (and (= kind 4)
