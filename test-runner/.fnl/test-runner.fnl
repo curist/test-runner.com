@@ -147,11 +147,13 @@
   (if (= 0 (length args))
       (set tests (walk "."))
       (each [_ path (ipairs args)]
-        (let [(ok stat) (pcall rb.unix.stat path)]
-          (if (and ok (= stat.kind 4))
+        (let [(stat err) (rb.unix.stat path)]
+        (if err
+          (error (.. "invalid filepath: " path))
+          (if (and stat (= stat.kind 4))
               (each [_ file (ipairs (walk path))]
                 (table.insert tests file))
-              (table.insert tests path)))))
+              (table.insert tests path))))))
   tests)
 
 (-> _G.arg collect-test-files run-tests)
