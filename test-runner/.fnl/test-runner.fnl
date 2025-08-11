@@ -32,16 +32,18 @@
                          (let [test-name (if (= (type name) :string) name (tostring name))
                                test-to-run (if (= (type name) :string) test-fn (. suite name))]
                            (when (and test-to-run (test-name:match "^test-"))
-                             (values test-name (future.async 
-                                                 #(do
-                                                    ;; Reset state and clear any previous collected tests
-                                                    (set assert.state.groups [])
-                                                    (set assert.state.collected-tests [])
-                                                    ;; Run test function to collect testing blocks
-                                                    (test-to-run)
-                                                    ;; Execute collected tests in parallel and get results
-                                                    (let [parallel-results (assert.execute-collected-tests)]
-                                                      {:groups parallel-results})))))))]
+                             (values
+                               test-name
+                               (future.async
+                                 #(do
+                                    ;; Reset state and clear any previous collected tests
+                                    (set assert.state.groups [])
+                                    (set assert.state.collected-tests [])
+                                    ;; Run test function to collect testing blocks
+                                    (test-to-run)
+                                    ;; Execute collected tests in parallel and get results
+                                    (let [parallel-results (assert.execute-collected-tests)]
+                                      {:groups parallel-results})))))))]
         (each [name task (pairs test-tasks)]
           (set results.total (+ results.total 1))
           (let [(ok res) (pcall #(task:await))
@@ -148,12 +150,12 @@
       (set tests (walk "."))
       (each [_ path (ipairs args)]
         (let [(stat err) (rb.unix.stat path)]
-        (if err
-          (error (.. "invalid filepath: " path))
-          (if (and stat (= stat.kind 4))
-              (each [_ file (ipairs (walk path))]
-                (table.insert tests file))
-              (table.insert tests path))))))
+          (if err
+              (error (.. "invalid filepath: " path))
+              (if (and stat (= stat.kind 4))
+                  (each [_ file (ipairs (walk path))]
+                    (table.insert tests file))
+                  (table.insert tests path))))))
   tests)
 
 (-> _G.arg collect-test-files run-tests)
