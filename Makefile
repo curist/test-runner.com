@@ -24,7 +24,10 @@ artifacts/test-runner.com: artifacts/redbean.dev.com test-runner/.lua/fennel.lua
 	mv redbean.com $@ 
 
 test: artifacts/test-runner.com
+	@echo "Running Fennel unit tests..."
 	@$< $(ARGS)
+	@echo
+	@./test/integration_test.sh
 
 clean:
 	rm -rf artifacts
