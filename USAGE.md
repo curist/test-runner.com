@@ -1,10 +1,21 @@
-Usage: test-runner.com [FLAG] [PATH...]
+SYNOPSIS
 
-Run test-runner, a self-contained Fennel test runner that discovers `*_test.fnl` files 
-and runs them in parallel.
+  test-runner.com [FLAG] [PATH...]
 
-  --help (-h)    : Display this text
-  --version (-v) : Show version and build information
+DESCRIPTION
+
+  test-runner - self-contained Fennel test runner
+
+OVERVIEW
+
+  test-runner makes it possible to run Fennel tests offline as a single
+  executable. It discovers `*_test.fnl` files and runs them in parallel
+  per file for fast execution.
+
+FLAGS
+
+  -h or --help     display this text
+  -v or --version  show version and build information
 
 When not given a path, discovers and runs all `*_test.fnl` files in the current directory.
 When given paths, runs tests only for the specified files or directories.
