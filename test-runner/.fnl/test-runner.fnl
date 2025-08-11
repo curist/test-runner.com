@@ -26,35 +26,36 @@
 (fn run-test-file [file]
   "Runs tests for a single file and returns a summary table."
   (let [suite (require (file:gsub "%.fnl$" ""))
-        results {:passed 0 :failed 0 :total 0 :errors [] :groups []}
-        test-tasks (collect [name test-fn (pairs suite)]
-                     (let [test-name (if (= (type name) :string) name (tostring name))
-                           test-to-run (if (= (type name) :string) test-fn (. suite name))]
-                       (when (and test-to-run (test-name:match "^test-"))
-                         (values test-name (future.async 
-                                             #(do
-                                                ;; Reset state and clear any previous collected tests
-                                                (set assert.state.groups [])
-                                                (set assert.state.collected-tests [])
-                                                ;; Run test function to collect testing blocks
-                                                (test-to-run)
-                                                ;; Execute collected tests in parallel and get results
-                                                (let [parallel-results (assert.execute-collected-tests)]
-                                                  {:groups parallel-results})))))))]
-    (each [name task (pairs test-tasks)]
-      (set results.total (+ results.total 1))
-      (let [(ok res) (pcall #(task:await))
-            name (name:gsub "^test%-" "")]
-        (let [test-groups (if (and ok (= (type res) :table) res.groups) 
-                              res.groups 
-                              [])]
-          (if ok
-              (do
-                (set results.passed (+ results.passed 1))
-                (table.insert results.errors {:ok true :name name :groups test-groups}))
-              (do
-                (set results.failed (+ results.failed 1))
-                (table.insert results.errors {:ok false :name name :reason res :groups test-groups}))))))
+        results {:passed 0 :failed 0 :total 0 :errors [] :groups []}]
+    (when (= (type suite) :table)
+      (let [test-tasks (collect [name test-fn (pairs suite)]
+                         (let [test-name (if (= (type name) :string) name (tostring name))
+                               test-to-run (if (= (type name) :string) test-fn (. suite name))]
+                           (when (and test-to-run (test-name:match "^test-"))
+                             (values test-name (future.async 
+                                                 #(do
+                                                    ;; Reset state and clear any previous collected tests
+                                                    (set assert.state.groups [])
+                                                    (set assert.state.collected-tests [])
+                                                    ;; Run test function to collect testing blocks
+                                                    (test-to-run)
+                                                    ;; Execute collected tests in parallel and get results
+                                                    (let [parallel-results (assert.execute-collected-tests)]
+                                                      {:groups parallel-results})))))))]
+        (each [name task (pairs test-tasks)]
+          (set results.total (+ results.total 1))
+          (let [(ok res) (pcall #(task:await))
+                name (name:gsub "^test%-" "")]
+            (let [test-groups (if (and ok (= (type res) :table) res.groups) 
+                                  res.groups 
+                                  [])]
+              (if ok
+                  (do
+                    (set results.passed (+ results.passed 1))
+                    (table.insert results.errors {:ok true :name name :groups test-groups}))
+                  (do
+                    (set results.failed (+ results.failed 1))
+                    (table.insert results.errors {:ok false :name name :reason res :groups test-groups}))))))))
     results))
 
 (fn organize-test-results [summary-errors]
@@ -146,10 +147,11 @@
   (if (= 0 (length args))
       (set tests (walk "."))
       (each [_ path (ipairs args)]
-        (if (path:match "_test.fnl$")
-            (table.insert tests path)
-            (each [_ file (ipairs (walk path))]
-              (table.insert tests file)))))
+        (let [(ok stat) (pcall rb.unix.stat path)]
+          (if (and ok (= stat.kind 4))
+              (each [_ file (ipairs (walk path))]
+                (table.insert tests file))
+              (table.insert tests path)))))
   tests)
 
 (-> _G.arg collect-test-files run-tests)
