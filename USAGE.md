@@ -39,12 +39,13 @@ Test files must be named `*_test.fnl` and export a table with `test-*` functions
 
 Assertions:
 
-  (assert.ok v ?msg)        Passes if v is truthy
-  (assert.falsy v ?msg)     Passes if v is nil or false
-  (assert.= a b)            Passes if a == b
-  (assert.not= a b)         Passes if a != b
-  (assert.nil? v)           Passes if v is nil
-  (assert.deep= a b)        Deep table equality check
+  (assert.ok v ?msg)           Passes if v is truthy
+  (assert.falsy v ?msg)        Passes if v is nil or false
+  (assert.= a b)               Passes if a == b
+  (assert.not= a b)            Passes if a != b
+  (assert.nil? v)              Passes if v is nil
+  (assert.deep= a b)           Deep table equality check
+  (assert.match pattern text)  Passes if text contains pattern (Lua patterns)
 
 Use `testing` for organized test groups:
 

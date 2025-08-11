@@ -56,6 +56,11 @@
         "\n  is not deeply equal to\n  "
         (fennel.view b))))
 
+(fn assert.match [pattern text]
+  "Asserts that text contains the given pattern using Lua string.find"
+  (handle-assertion (string.find text pattern)
+    (.. "Pattern '" pattern "' not found in text: " (tostring text))))
+
 
 
 (fn assert.testing [description test-fn]

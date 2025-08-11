@@ -78,6 +78,20 @@
     (set assert.state.current-group old-current-group)))
 
 
+(fn test-match-operator []
+  "Test assert.match function with various patterns"
+  (assert.match "hello" "hello world")
+  (assert.match "wor" "hello world")
+  (assert.match "%d+" "test 123 string")
+  (assert.match "^start" "start of line")
+  (assert.match "end$" "line end"))
+   
+(fn test-match-operator-failure []
+  "Test that assert.match fails appropriately"
+  (let [(ok? err) (pcall assert.match "not found" "hello world")]
+    (assert.ok (not ok?))
+    (assert.ok (string.find err "Pattern 'not found' not found in text: hello world"))))
+
 {: test-equal-operator
  : test-not-equal-operator
  : test-nil-operator
@@ -86,4 +100,6 @@
  : test-deep-equal-operator
  : test-testing-function
  : test-testing-with-failures
- : test-testing-nested-error}
+ : test-testing-nested-error
+ : test-match-operator
+ : test-match-operator-failure}
