@@ -185,6 +185,12 @@
           (show-help)
           (or (= arg "--version") (= arg "-v"))
           (show-version)
+          ;; Check for unknown flags
+          (arg:match "^%-")
+          (do
+            (print (.. "test-runner.com: unknown option '" arg "'"))
+            (print "Try 'test-runner.com --help' for more information.")
+            (os.exit 1))
           ;; Not a flag, keep it
           (table.insert filtered-args arg)))
     filtered-args))
