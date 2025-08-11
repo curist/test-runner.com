@@ -41,21 +41,12 @@ make test
 
 # Or run the binary directly
 ./artifacts/test-runner.com
+
+# Show usage help
+./artifacts/test-runner.com --help
 ```
 
-### Filter which tests to run
-You can pass paths (files or directories). Examples:
-
-```sh
-# Run only one file
-./artifacts/test-runner.com test/assert_test.fnl
-
-# Run everything under a directory
-./artifacts/test-runner.com test/
-
-# Using make and forwarding args
-make test ARGS="test/ test/assert_test.fnl"
-```
+For detailed usage examples, see [USAGE.md](USAGE.md).
 
 ## Make Targets
 
@@ -64,13 +55,4 @@ make test ARGS="test/ test/assert_test.fnl"
 - `make clean` – remove build outputs
 - `make lint` – lint `*.fnl` with `fennel-ls` (must be installed)
 
-## Assertions
-
-| Function                | Description |
-|-------------------------|-------------|
-| `(assert.ok v ?msg)`   | Passes if `v` is truthy. Optional `?msg` overrides default error text. |
-| `(assert.falsy v ?msg)`| Passes if `v` is `nil` or `false`. |
-| `(assert.= a b)`        | Passes if `a == b`. |
-| `(assert.not= a b)`     | Passes if `a != b`. |
-| `(assert.nil? v)`       | Passes if `v` is `nil`. |
-| `(assert.deep= a b)`    | Deep table equality check; works recursively. |
+For complete usage documentation including test structure, assertions, and mocking, see [USAGE.md](USAGE.md).

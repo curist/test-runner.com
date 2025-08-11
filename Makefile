@@ -16,10 +16,11 @@ test-runner/.lua/fennel.lua:
 	mkdir -p $(@D)
 	curl -o $@ https://fennel-lang.org/downloads/fennel-${FENNEL_VERSION}.lua
 
-artifacts/test-runner.com: artifacts/redbean.dev.com test-runner/.lua/fennel.lua test-runner/.fnl/redbean.fnl $(TEST_RUNNER_SRC)
+artifacts/test-runner.com: artifacts/redbean.dev.com test-runner/.lua/fennel.lua test-runner/.fnl/redbean.fnl $(TEST_RUNNER_SRC) USAGE.md artifacts/redbean.version.txt
 	cp $< redbean.com
 	cd test-runner && zip -r ../redbean.com .
-	zip -j redbean.com LICENSE
+	zip -j redbean.com LICENSE USAGE.md artifacts/redbean.version.txt
+	@if [ -f VERSION.txt ]; then zip -j redbean.com VERSION.txt; fi
 	mv redbean.com $@ 
 
 test: artifacts/test-runner.com

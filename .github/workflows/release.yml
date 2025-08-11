@@ -16,6 +16,8 @@ jobs:
 
       - name: Build test runner
         run: |
+          # Extract version from tag and create version file
+          echo "${GITHUB_REF#refs/tags/}" > VERSION.txt
           # make test build the test-runner and run tests
           make test
 

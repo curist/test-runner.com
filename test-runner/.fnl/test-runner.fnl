@@ -158,4 +158,35 @@
                   (table.insert tests path))))))
   tests)
 
-(-> _G.arg collect-test-files run-tests)
+(fn show-help []
+  "Display help information from embedded USAGE.md"
+  (let [usage-content (rb.slurp "/zip/USAGE.md")]
+    (if usage-content
+        (print usage-content)
+        (print "Help documentation not available")))
+  (os.exit 0))
+
+(fn show-version []
+  "Display version and build information"
+  (let [version (rb.slurp "/zip/VERSION.txt")
+        redbean-version (or (rb.slurp "/zip/redbean.version.txt") "unknown")]
+    (if version
+        (print (.. "test-runner.com " (version:gsub "\n" "")))
+        (print "test-runner.com (dev)"))
+    (print (.. "redbean version: " (redbean-version:gsub "\n" "")))
+    (print "fennel version: 1.5.3"))
+  (os.exit 0))
+
+(fn parse-flags [args]
+  "Parse command line flags and return filtered arguments"
+  (let [filtered-args []]
+    (each [_ arg (ipairs args)]
+      (if (or (= arg "--help") (= arg "-h"))
+          (show-help)
+          (or (= arg "--version") (= arg "-v"))
+          (show-version)
+          ;; Not a flag, keep it
+          (table.insert filtered-args arg)))
+    filtered-args))
+
+(-> _G.arg parse-flags collect-test-files run-tests)
