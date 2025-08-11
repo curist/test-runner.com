@@ -47,7 +47,7 @@ Test files must be named `*_test.fnl` and return a table with `test-*` functions
 
 See [assert_test.fnl](test/assert_test.fnl) for a complete example.
 
-For detailed usage documentation including assertions and mocking, see [USAGE.md](USAGE.md).
+For detailed usage documentation including assertions and mocking, see [USAGE.md](USAGE.md?plain=1).
 
 ## Development
 
