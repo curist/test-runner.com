@@ -152,10 +152,13 @@
         (let [(stat err) (rb.unix.stat path)]
           (if err
               (error (.. "invalid filepath: " path))
-              (if (and stat (= stat.kind 4))
+              ;; Check if it's a directory using mode (S_IFDIR = 040000)
+              (if (and stat (= (band (stat:mode) 0170000) 040000))
                   (each [_ file (ipairs (walk path))]
                     (table.insert tests file))
-                  (table.insert tests path))))))
+                  ;; Add any .fnl file when explicitly specified
+                  (when (path:match "%.fnl$")
+                    (table.insert tests path)))))))
   tests)
 
 (fn show-help []
