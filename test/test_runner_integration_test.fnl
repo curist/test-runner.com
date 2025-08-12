@@ -1,6 +1,5 @@
 (local assert (require :assert))
 (local test-runner (require :test-runner))
-(local mocks (require :mocks))
 
 {:test-walk-finds-test-files
  (fn []
@@ -28,9 +27,9 @@
      ;; Should find our own test files
      (var found-self false)
      (each [_ file (ipairs files)]
-       (when (file:match "test_runner_test%.fnl$")
+       (when (file:match "test_runner_integration_test%.fnl$")
          (set found-self true)))
-     (assert.ok found-self "Should find test_runner_test.fnl")))
+     (assert.ok found-self "Should find test_runner_integration_test.fnl")))
 
  :test-collect-test-files-with-directory-arg
  (fn []
