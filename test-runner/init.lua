@@ -1,2 +1,2 @@
 require("fennel-install")
-require("test-runner")
+require("main")
