@@ -254,7 +254,7 @@
 
 (fn Future.nanosleep [sec nsec]
   "Returns a future that completes after a specified duration."
-  (Future.async (fn [] (rb.unix.nanosleep sec nsec))))
+  (Future.async (fn [] (rb.unix.nanosleep sec nsec) 0)))
 
 (fn Future.sleep [ms]
   "Returns a future that completes after a specified duration in milliseconds."
