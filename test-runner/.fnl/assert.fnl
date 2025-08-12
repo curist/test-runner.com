@@ -61,6 +61,16 @@
   (handle-assertion (string.find text pattern)
     (.. "Pattern '" pattern "' not found in text: " (tostring text))))
 
+(fn assert.throws [test-fn ?pattern]
+  "Asserts that calling test-fn throws an error, optionally matching a pattern"
+  (let [(ok? err) (pcall test-fn)]
+    (if ok?
+        (handle-assertion false "Expected function to throw an error, but it succeeded")
+        (if ?pattern
+            (handle-assertion (string.find err ?pattern)
+              (.. "Error message '" err "' does not match pattern '" ?pattern "'"))
+            (handle-assertion true)))))
+
 
 
 (fn assert.testing [description test-fn]

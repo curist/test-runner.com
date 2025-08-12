@@ -46,6 +46,7 @@ Assertions:
   (assert.nil? v)              Passes if v is nil
   (assert.deep= a b)           Deep table equality check
   (assert.match pattern text)  Passes if text contains pattern (Lua patterns)
+  (assert.throws fn ?pattern)  Passes if fn throws an error, optionally matching pattern
 
 Use `testing` for organized test groups:
 

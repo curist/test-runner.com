@@ -20,9 +20,7 @@
   (assert.ok "hello"))
 
 (fn test-ok-operator-with-message []
-  (let [(ok? err) (pcall (fn [] (assert.ok false "this should fail")))]
-    (assert.ok (not ok?))
-    (assert.ok (string.find err "this should fail"))))
+  (assert.throws #(assert.ok false "this should fail") "this should fail"))
 
 (fn test-deep-equal-operator []
   (assert.deep= {:a 1 :b 2} {:a 1 :b 2})
@@ -50,14 +48,7 @@
 
 (fn test-testing-with-failures []
   ;; Test that assertion failures propagate correctly from testing blocks
-  ;; We verify this by checking that pcall catches the errors properly
-  (let [;; Test basic assertion failure propagation
-        (ok1? err1) (pcall assert.= 1 2)
-        ;; Test that errors are caught when assertions fail
-        error-contains-expected-message? (string.find err1 "1 is not equal to 2")]
-    ;; Verify the failure was caught and has the right message
-    (assert.ok (not ok1?))
-    (assert.ok error-contains-expected-message?)))
+  (assert.throws #(assert.= 1 2) "1 is not equal to 2"))
 
 (fn test-testing-nested-error []
   ;; Test that nested assert.testing calls throw an error
@@ -69,10 +60,8 @@
     ;; Collect the outer test
     (testing "outer" #(testing "inner" #(assert.ok true)))
     ;; Execute and verify it fails with nested error
-    (let [(ok? err) (pcall assert.execute-collected-tests)]
-      (assert.ok (not ok?))
-      (assert.ok (string.find err "Nested assert.testing calls are not supported"))
-      (assert.ok (string.find err "Found 'inner' inside 'outer'")))
+    (assert.throws assert.execute-collected-tests "Nested assert.testing calls are not supported")
+    (assert.throws assert.execute-collected-tests "Found 'inner' inside 'outer'")
     ;; Restore state
     (set assert.state.collected-tests old-collected)
     (set assert.state.current-group old-current-group)))
@@ -85,12 +74,35 @@
   (assert.match "%d+" "test 123 string")
   (assert.match "^start" "start of line")
   (assert.match "end$" "line end"))
-   
+
 (fn test-match-operator-failure []
   "Test that assert.match fails appropriately"
-  (let [(ok? err) (pcall assert.match "not found" "hello world")]
+  (assert.throws
+    #(assert.match "not found" "hello world")
+    "Pattern 'not found' not found in text: hello world"))
+
+(fn test-throws-operator []
+  "Test assert.throws function with functions that should throw"
+  (assert.throws #(error "test error"))
+  (assert.throws #(assert.= 1 2)))
+
+(fn test-throws-operator-with-pattern []
+  "Test assert.throws function with pattern matching"
+  (assert.throws #(error "specific error message") "specific error")
+  (assert.throws #(assert.= 1 2) "1 is not equal to 2")
+  (assert.throws #(assert.nil? "not nil") "not nil"))
+
+(fn test-throws-operator-failure-no-error []
+  "Test that assert.throws fails when function doesn't throw"
+  (let [(ok? err) (pcall assert.throws #(+ 1 1))]
     (assert.ok (not ok?))
-    (assert.ok (string.find err "Pattern 'not found' not found in text: hello world"))))
+    (assert.ok (string.find err "Expected function to throw an error, but it succeeded"))))
+
+(fn test-throws-operator-failure-wrong-pattern []
+  "Test that assert.throws fails when error doesn't match pattern"
+  (let [(ok? err) (pcall assert.throws #(error "actual error") "wrong pattern")]
+    (assert.ok (not ok?))
+    (assert.ok (string.find err "Error message .* does not match pattern 'wrong pattern'"))))
 
 {: test-equal-operator
  : test-not-equal-operator
@@ -102,4 +114,8 @@
  : test-testing-with-failures
  : test-testing-nested-error
  : test-match-operator
- : test-match-operator-failure}
+ : test-match-operator-failure
+ : test-throws-operator
+ : test-throws-operator-with-pattern
+ : test-throws-operator-failure-no-error
+ : test-throws-operator-failure-wrong-pattern}
