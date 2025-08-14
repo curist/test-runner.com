@@ -1,7 +1,6 @@
 ;; A simple Future implementation for concurrent tasks using fork/pipe.
 
 (local rb (require :redbean))
-(local fennel (require :fennel))
 
 (local Future {:__name "Future"})
 (set Future.__index Future)
@@ -39,9 +38,13 @@
         (do
           (rb.unix.close read-fd) ;; Worker doesn't read
           (let [(ok result) (pcall f)]
-            (let [payload (if ok
-                              (fennel.view {:value result})
-                              (fennel.view {:error result}))]
+            (let [data {}
+                  key (if ok :value :error)
+                  _ (tset data key result)
+                  (payload err) (rb.encode-json data)
+                  payload (if err
+                              (rb.encode-json {:error err})
+                              payload)]
               (rb.unix.write write-fd payload)))
           (rb.unix.close write-fd)
           (rb.unix.exit 0))
@@ -76,7 +79,7 @@
           (error "timeout"))
         ;; Read and decode the result from the pipe
         (let [payload (assert (rb.unix.read self.read_fd))
-              decoded (fennel.eval payload)]
+              decoded (rb.decode-json payload)]
           ;; --- Cleanup ---
           (rb.unix.close self.read_fd)
           (wait-for-process self.pid)
