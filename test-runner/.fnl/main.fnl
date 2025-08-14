@@ -39,17 +39,7 @@
     filtered-args))
 
 ;; Main execution with enhanced error handling
-(let [(ok result) (pcall #(-> _G.arg 
-                              parse-flags 
-                              test-runner.collect-test-files 
-                              test-runner.run-tests))]
-  (when (not ok)
-    (print "\n[ERROR] Test runner failed with the following error:")
-    (print (debug.traceback result))
-    (print "\nThis error occurred during test execution.")
-    (print "If you see 'attempt to index a nil value', this may indicate:")
-    (print "- A child test process crashed or produced corrupted output")
-    (print "- Network or filesystem issues during test execution")
-    (print "- Memory corruption or other system-level problems")
-    (print "\nFor more detailed debugging, try running individual test files.")
-    (os.exit 1)))
+(-> _G.arg
+    parse-flags
+    test-runner.collect-test-files
+    test-runner.run-tests)
