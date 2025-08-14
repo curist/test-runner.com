@@ -14,8 +14,8 @@
        (getmetatable value)
        (let [name (. (getmetatable value) :__name)]
          (or (= name "Future")
-           (= name "AllFuture")
-           (= name "RaceFuture")))))
+             (= name "AllFuture")
+             (= name "RaceFuture")))))
 
 (fn wait-for-process [pid]
   "Wait for process to exit, handling WNOHANG properly."
@@ -37,13 +37,11 @@
         ;; --- Child (Worker) Process ---
         (do
           (rb.unix.close read-fd) ;; Worker doesn't read
-          (let [(ok result) (pcall f)]
-            (let [data {}
-                  key (if ok :value :error)
-                  _ (tset data key result)
+          (let [(ok result) (xpcall f debug.traceback)]
+            (let [data (if ok {:value result} {:error result})
                   (payload err) (rb.encode-json data)
                   payload (if err
-                              (rb.encode-json {:error err})
+                              (rb.encode-json {:error (tostring err)})
                               payload)]
               (rb.unix.write write-fd payload)))
           (rb.unix.close write-fd)
