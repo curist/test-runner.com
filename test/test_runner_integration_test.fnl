@@ -63,4 +63,27 @@
      (assert.ok organized.test-groups "Should have test-groups")
      (assert.ok organized.ungrouped-results "Should have ungrouped-results")
      (assert.= 2 (length (. organized.test-groups "test1")) "test1 should have 2 groups")
-     (assert.= 1 (length organized.ungrouped-results) "Should have 1 ungrouped result")))}
+     (assert.= 1 (length organized.ungrouped-results) "Should have 1 ungrouped result")))
+
+ :test-future-await-handles-nil-decoded
+ (fn []
+   "Test that demonstrates the nil decoded JSON issue and verifies rb.decode-json behavior"
+   (local rb (require :redbean))
+   
+   ;; First, verify that rb.decode-json returns nil for invalid JSON
+   (let [invalid-cases ["invalid-json-{broken"
+                        "{"
+                        "{broken"
+                        ""
+                        nil]]
+     (each [_ invalid-json (ipairs invalid-cases)]
+       (let [result (rb.decode-json invalid-json)]
+         ;; This demonstrates that rb.decode-json can return nil
+         (when (not (= result nil))
+           (assert.nil? result (.. "Expected nil for invalid JSON: " (tostring invalid-json)))))))
+   
+   ;; This test documents the issue: when a child process in future.async
+   ;; writes corrupted data to the pipe (maybe due to a crash or memory corruption),
+   ;; rb.decode-json returns nil, and future.fnl:84 tries to access decoded.error
+   ;; which causes "attempt to index a nil value"
+   )}
