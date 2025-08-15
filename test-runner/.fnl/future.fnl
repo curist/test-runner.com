@@ -14,8 +14,8 @@
        (getmetatable value)
        (let [name (. (getmetatable value) :__name)]
          (or (= name "Future")
-             (= name "AllFuture")
-             (= name "RaceFuture")))))
+           (= name "AllFuture")
+           (= name "RaceFuture")))))
 
 (fn wait-for-process [pid]
   "Wait for process to exit, handling WNOHANG properly."
@@ -26,88 +26,29 @@
       (rb.unix.nanosleep 0 1000000))) ;; Sleep 1ms
   status)
 
-;; I/O utilities for reliable pipe communication
-(fn write-all [fd data]
-  "Write all data to file descriptor, handling partial writes.
-   Loops until all bytes are written, since unix.write may return partial byte counts."
-  (var remaining data)
-  (while (> (length remaining) 0)
-    (let [written (assert (rb.unix.write fd remaining))]
-      (if (= written (length remaining))
-          (set remaining "")  ; All data written
-          (set remaining (string.sub remaining (+ written 1)))))))
-
-(fn read-all [fd]
-  "Read all data from file descriptor until EOF.
-   Accumulates chunks until unix.read returns empty string (EOF)."
-  (var complete-data "")
-  (var done false)
-  (while (not done)
-    (let [(ok chunk) (pcall rb.unix.read fd)]
-      (if (and ok chunk (not= chunk ""))
-          (set complete-data (.. complete-data chunk))
-          (set done true))))
-  complete-data)
-
 (fn Future.async [f]
   "Runs a function in a separate process and returns a future object.
    The provided function `f` should return a single, JSON-serializable value."
   (assert (= (type f) "function") "future.async requires a function")
 
   (let [(read-fd write-fd) (assert (rb.unix.pipe))
-        ;; Duplicate to higher FD numbers to avoid reuse conflicts
-        ;; Let system auto-allocate starting from 100 to avoid conflicts
-        safe-read-fd (assert (rb.unix.dup read-fd nil 0 100))
-        safe-write-fd (assert (rb.unix.dup write-fd nil 0 100))
-        _ (do
-            ;; Debug: Show FD allocation for CI validation
-            (io.stderr:write (.. "DEBUG: PID=" (rb.unix.getpid) 
-                               " pipe(" read-fd "," write-fd 
-                               ") → dup(" safe-read-fd "," safe-write-fd ")\n"))
-            ;; Close original low-numbered FDs immediately
-            (rb.unix.close read-fd)
-            (rb.unix.close write-fd))
         pid (assert (rb.unix.fork))]
     (if (= 0 pid)
         ;; --- Child (Worker) Process ---
         (do
-          ;; Store expected write-fd at the very start to prevent variable confusion
-          (local expected-write-fd safe-write-fd)
-          ;; Debug: Show child process start with inherited FDs
-          (io.stderr:write (.. "DEBUG: Child PID=" (rb.unix.getpid) 
-                             " parent=" (rb.unix.getppid)
-                             " expected-fd=" expected-write-fd 
-                             " actual-fd=" safe-write-fd "\n"))
-          ;; Validate FDs haven't been corrupted by inheritance
-          (when (not= safe-write-fd expected-write-fd)
-            (io.stderr:write (.. "ERROR: Child " (rb.unix.getpid) " FD corruption detected! Expected " expected-write-fd " got " safe-write-fd "\n"))
-            (rb.unix.exit 1))
-          ;; Close read-fd immediately to prevent confusion
-          (rb.unix.close safe-read-fd)
-          (let [(ok result) (xpcall f debug.traceback)]
-            (let [data (if ok {:value result} {:error result})
-                  (payload err) (rb.encode-json data)]
-              ;; Final validation before writing
-              (when (not= safe-write-fd expected-write-fd)
-                (io.stderr:write (.. "ERROR: Child " (rb.unix.getpid) " FD changed during execution! Expected " expected-write-fd " got " safe-write-fd "\n"))
-                (rb.unix.exit 1))
-              (if err
-                  ;; If JSON encoding fails, encode the error message
-                  (let [error-payload (rb.encode-json {:error (tostring err)})]
-                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing ERROR to validated-fd=" expected-write-fd "\n"))
-                    (write-all expected-write-fd error-payload))
-                  ;; If JSON encoding succeeds, write the payload
-                  (do
-                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing SUCCESS to validated-fd=" expected-write-fd "\n"))
-                    (write-all expected-write-fd payload)))))
-          (rb.unix.close expected-write-fd)
+          (rb.unix.close read-fd) ;; Worker doesn't read
+          (let [(ok result) (pcall f)]
+            (let [payload (if ok
+                              (rb.encode-json {:value result})
+                              (rb.encode-json {:error result}))]
+              (rb.unix.write write-fd payload)))
+          (rb.unix.close write-fd)
           (rb.unix.exit 0))
         ;; --- Parent (Supervisor) Process ---
         (do
-          ;; Close write-fd immediately to prevent confusion  
-          (rb.unix.close safe-write-fd)
+          (rb.unix.close write-fd) ;; Parent doesn't write
           (let [self {:pid pid
-                      :read_fd safe-read-fd
+                      :read_fd read-fd
                       :status :pending
                       :result nil}]
             (setmetatable self Future))))))
@@ -132,26 +73,14 @@
         (when (table-is-empty? ready-fds)
           (self:cancel)
           (error "timeout"))
-        ;; Read all data until EOF (child closed write end)
-        (local complete-payload (read-all self.read_fd))
-
-        ;; --- Cleanup ---
-        (rb.unix.close self.read_fd)
-        (wait-for-process self.pid)
-        ;; --- Cache and return result ---
-        (set self.status :resolved)
-        ;; Debug: Show successful payload read
-        (io.stderr:write (.. "DEBUG: Parent PID=" (rb.unix.getpid) 
-                           " read " (length complete-payload) " bytes"
-                           " from child=" self.pid "\n"))
-        ;; Debug: Show payload content if decode fails
-        (when (= complete-payload "")
-          (io.stderr:write (.. "DEBUG: EMPTY payload from child=" self.pid "\n")))
-        (when (and complete-payload (> (length complete-payload) 0))
-          (io.stderr:write (.. "DEBUG: Payload preview: " (string.sub complete-payload 1 100) "\n")))
-        (let [decoded (rb.decode-json complete-payload)]
-          (when (not decoded)
-            (io.stderr:write (.. "DEBUG: JSON decode FAILED for payload: '" complete-payload "'\n")))
+        ;; Read and decode the result from the pipe
+        (let [payload (assert (rb.unix.read self.read_fd))
+              decoded (rb.decode-json payload)]
+          ;; --- Cleanup ---
+          (rb.unix.close self.read_fd)
+          (wait-for-process self.pid)
+          ;; --- Cache and return result ---
+          (set self.status :resolved)
           (if decoded.error
               (do
                 (set self.error decoded.error)
@@ -333,10 +262,5 @@
   (let [sec (math.floor (/ ms 1000))
         nsec (* (% ms 1000) 1000000)]
     (Future.nanosleep sec nsec)))
-
-;; Export internal utilities for testing
-(set Future.__internal__
-  {: write-all
-   : read-all})
 
 Future

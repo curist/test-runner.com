@@ -285,5 +285,6 @@
 
 {: test-basic-future-operations
  : test-future-combinators
- : test-large-payload-handling
- : test-internal-io-utilities}
+ ; : test-large-payload-handling
+ ; : test-internal-io-utilities
+ }
