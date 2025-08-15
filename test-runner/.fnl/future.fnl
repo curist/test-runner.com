@@ -106,8 +106,19 @@
         (wait-for-process self.pid)
         ;; --- Cache and return result ---
         (set self.status :resolved)
-        ;; No nil check - let it crash if JSON is invalid
+        ;; Debug logging for CI failures
+        (when (not complete-payload)
+          (io.stderr:write (.. "DEBUG: complete-payload is nil\n")))
+        (when (= complete-payload "")
+          (io.stderr:write (.. "DEBUG: complete-payload is empty string\n")))
+        (when (and complete-payload (not= complete-payload ""))
+          (io.stderr:write (.. "DEBUG: payload length: " (length complete-payload) "\n"))
+          (io.stderr:write (.. "DEBUG: payload first 100 chars: " (string.sub complete-payload 1 100) "\n")))
+        ;; Temporary nil check for debugging CI failures
         (let [decoded (rb.decode-json complete-payload)]
+          (when (not decoded)
+            (io.stderr:write (.. "DEBUG: rb.decode-json returned nil for payload: '" complete-payload "'\n"))
+            (error "JSON decode failed - see debug output above"))
           (if decoded.error
               (do
                 (set self.error decoded.error)
