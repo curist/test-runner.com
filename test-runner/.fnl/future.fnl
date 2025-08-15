@@ -71,25 +71,36 @@
     (if (= 0 pid)
         ;; --- Child (Worker) Process ---
         (do
+          ;; Store expected write-fd at the very start to prevent variable confusion
+          (local expected-write-fd safe-write-fd)
           ;; Debug: Show child process start with inherited FDs
           (io.stderr:write (.. "DEBUG: Child PID=" (rb.unix.getpid) 
                              " parent=" (rb.unix.getppid)
-                             " using write-fd=" safe-write-fd "\n"))
+                             " expected-fd=" expected-write-fd 
+                             " actual-fd=" safe-write-fd "\n"))
+          ;; Validate FDs haven't been corrupted by inheritance
+          (when (not= safe-write-fd expected-write-fd)
+            (io.stderr:write (.. "ERROR: Child " (rb.unix.getpid) " FD corruption detected! Expected " expected-write-fd " got " safe-write-fd "\n"))
+            (rb.unix.exit 1))
           ;; Close read-fd immediately to prevent confusion
           (rb.unix.close safe-read-fd)
           (let [(ok result) (xpcall f debug.traceback)]
             (let [data (if ok {:value result} {:error result})
                   (payload err) (rb.encode-json data)]
+              ;; Final validation before writing
+              (when (not= safe-write-fd expected-write-fd)
+                (io.stderr:write (.. "ERROR: Child " (rb.unix.getpid) " FD changed during execution! Expected " expected-write-fd " got " safe-write-fd "\n"))
+                (rb.unix.exit 1))
               (if err
                   ;; If JSON encoding fails, encode the error message
                   (let [error-payload (rb.encode-json {:error (tostring err)})]
-                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing ERROR to fd=" safe-write-fd "\n"))
-                    (write-all safe-write-fd error-payload))
+                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing ERROR to validated-fd=" expected-write-fd "\n"))
+                    (write-all expected-write-fd error-payload))
                   ;; If JSON encoding succeeds, write the payload
                   (do
-                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing SUCCESS to fd=" safe-write-fd "\n"))
-                    (write-all safe-write-fd payload)))))
-          (rb.unix.close safe-write-fd)
+                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing SUCCESS to validated-fd=" expected-write-fd "\n"))
+                    (write-all expected-write-fd payload)))))
+          (rb.unix.close expected-write-fd)
           (rb.unix.exit 0))
         ;; --- Parent (Supervisor) Process ---
         (do
@@ -133,7 +144,14 @@
         (io.stderr:write (.. "DEBUG: Parent PID=" (rb.unix.getpid) 
                            " read " (length complete-payload) " bytes"
                            " from child=" self.pid "\n"))
+        ;; Debug: Show payload content if decode fails
+        (when (= complete-payload "")
+          (io.stderr:write (.. "DEBUG: EMPTY payload from child=" self.pid "\n")))
+        (when (and complete-payload (> (length complete-payload) 0))
+          (io.stderr:write (.. "DEBUG: Payload preview: " (string.sub complete-payload 1 100) "\n")))
         (let [decoded (rb.decode-json complete-payload)]
+          (when (not decoded)
+            (io.stderr:write (.. "DEBUG: JSON decode FAILED for payload: '" complete-payload "'\n")))
           (if decoded.error
               (do
                 (set self.error decoded.error)
