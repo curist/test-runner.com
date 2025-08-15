@@ -193,6 +193,97 @@
            (assert.not= regular-table wrapped "Regular table should be wrapped")
            (assert.deep= regular-table (wrapped:await) "Wrapped table should contain original value"))))))
 
+(fn test-large-payload-handling []
+  (testing "large payload write-until-complete"
+    #(do
+       ;; Test with payload larger than PIPE_BUF (4096 bytes)
+       (let [large-string (string.rep "abcdefghij" 500)  ; 5000 bytes
+             f (future.async (fn [] large-string))
+             result (f:await)]
+         (assert.= 5000 (length result))
+         (assert.= large-string result))
+       
+       ;; Test with large table payload
+       (let [large-table (fcollect [i 1 1000] {:id i :data (string.rep "x" 10)})
+             f (future.async (fn [] large-table))
+             result (f:await)]
+         (assert.= 1000 (length result))
+         (assert.= 1 (. result 1 :id))
+         (assert.= 1000 (. result 1000 :id))
+         (assert.= "xxxxxxxxxx" (. result 1 :data)))
+       
+       ;; Test partial write scenario with mixed content
+       (let [complex-data {:large-text (string.rep "Lorem ipsum dolor sit amet, " 200)  ; ~5600 bytes
+                          :numbers (fcollect [i 1 100] i)
+                          :nested {:deep {:data (string.rep "nested" 100)}}}
+             f (future.async (fn [] complex-data))
+             result (f:await)]
+         (assert.= (length complex-data.large-text) (length result.large-text))
+         (assert.= 100 (length result.numbers))
+         (assert.= 1 (. result.numbers 1))
+         (assert.= 100 (. result.numbers 100))
+         (assert.= (string.rep "nested" 100) result.nested.deep.data)))))
+
+(fn test-internal-io-utilities []
+  (testing "write-all handles partial writes correctly"
+    #(do
+       ;; Test write-all with small data
+       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+             test-data "hello world"
+             _ (future.__internal__.write-all write-fd test-data)
+             _ (rb.unix.close write-fd)
+             result (future.__internal__.read-all read-fd)]
+         (rb.unix.close read-fd)
+         (assert.= test-data result))
+       
+       ;; Test write-all with large data (>4KB)
+       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+             large-data (string.rep "abcdefghij" 500)  ; 5000 bytes
+             _ (future.__internal__.write-all write-fd large-data)
+             _ (rb.unix.close write-fd)  ; Signal EOF
+             result (future.__internal__.read-all read-fd)]
+         (rb.unix.close read-fd)
+         (assert.= 5000 (length result))
+         (assert.= large-data result))))
+  
+  (testing "read-all handles EOF and partial reads correctly"
+    #(do
+       ;; Test read-all with empty data
+       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+             _ (rb.unix.close write-fd)  ; Immediate EOF
+             result (future.__internal__.read-all read-fd)]
+         (rb.unix.close read-fd)
+         (assert.= "" result))
+       
+       ;; Test read-all with multiple writes
+       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+             _ (rb.unix.write write-fd "part1")
+             _ (rb.unix.write write-fd "part2") 
+             _ (rb.unix.write write-fd "part3")
+             _ (rb.unix.close write-fd)  ; Signal EOF
+             result (future.__internal__.read-all read-fd)]
+         (rb.unix.close read-fd)
+         (assert.= "part1part2part3" result))))
+  
+  (testing "write-all and read-all integration with JSON"
+    ;; Test round-trip with complex JSON data
+    #(let [test-data {:numbers (fcollect [i 1 100] (* i i))
+                      :text (string.rep "integration test " 50)
+                      :nested {:deep {:value "success"}}}
+           json-payload (rb.encode-json test-data)
+           (read-fd write-fd) (_G.assert (rb.unix.pipe))
+           _ (future.__internal__.write-all write-fd json-payload)
+           _ (rb.unix.close write-fd)
+           received-json (future.__internal__.read-all read-fd)
+           decoded-data (rb.decode-json received-json)]
+       (rb.unix.close read-fd)
+       (assert.= (length test-data.numbers) (length decoded-data.numbers))
+       (assert.= (. test-data.numbers 1) (. decoded-data.numbers 1))
+       (assert.= (. test-data.numbers 100) (. decoded-data.numbers 100))
+       (assert.= test-data.text decoded-data.text)
+       (assert.= test-data.nested.deep.value decoded-data.nested.deep.value))))
+
 {: test-basic-future-operations
  : test-future-combinators
- }
+ : test-large-payload-handling
+ : test-internal-io-utilities}
