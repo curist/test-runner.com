@@ -297,14 +297,13 @@
        (assert.= test-data.nested.deep.value decoded-data.nested.deep.value))))
   
   (testing "write-all error handling"
-    #(do
-       ;; Test writing to closed file descriptor
-       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
-             _ (rb.unix.close write-fd)
-             (written err) (future.__internal__.write-all write-fd "test data")]
-         (rb.unix.close read-fd)
-         (assert.nil? written)
-         (assert.ok err "Expected error when writing to closed fd"))))
+    ;; Test writing to closed file descriptor
+    #(let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+           _ (rb.unix.close write-fd)
+           (written err) (future.__internal__.write-all write-fd "test data")]
+       (rb.unix.close read-fd)
+       (assert.nil? written)
+       (assert.ok err "Expected error when writing to closed fd")))
 
 {: test-basic-future-operations
  : test-future-combinators
