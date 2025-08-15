@@ -191,26 +191,35 @@
 (fn run-tests [tests]
   (assert.reset)
   (let [start-time (get-time-ms)
-        test-tasks (icollect [_ file (ipairs tests)]
-                     (future.async #(run-test-file file)))
-        colors {:green "\27[1;32m" :red "\27[1;31m" :reset "\27[0m"
-                :gray "\27[90m" :yellow "\27[0;33m"}
+        rb (require :redbean)
+        cpu-count (rb.get-cpu-count)
+        ;; Use CPU count to limit parallelism, with reasonable bounds
+        max-parallel (math.max (math.min cpu-count 16) 1)
         test-results []
-        all-failed-tests []]
-    (each [i file (ipairs tests)]
-      (print)
-      (print file)
-      (let [task (. test-tasks i)
-            summary (task:await)]
-        ;; Collect overall test results
-        (each [_ result (ipairs summary.errors)]
-          (table.insert test-results result.ok))
-        ;; Organize and display results for this file
-        (let [organized (organize-test-results summary.errors)
-              failed-tests (display-test-results organized colors)]
-          ;; Accumulate all failed tests
-          (each [_ failure (ipairs failed-tests)]
-            (table.insert all-failed-tests failure)))))
+        all-failed-tests []
+        colors {:green "\27[1;32m" :red "\27[1;31m" :reset "\27[0m"
+                :gray "\27[90m" :yellow "\27[0;33m"}]
+    ;; Process test files in CPU-limited batches
+    (for [batch-start 1 (length tests) max-parallel]
+      (let [batch-end (math.min (+ batch-start max-parallel -1) (length tests))
+            batch-files (fcollect [i batch-start batch-end] (. tests i))
+            batch-tasks (icollect [_ file (ipairs batch-files)]
+                          (future.async #(run-test-file file)))]
+        ;; Process results for this batch
+        (each [i file (ipairs batch-files)]
+          (print)
+          (print file)
+          (let [task (. batch-tasks i)
+                summary (task:await)]
+            ;; Collect overall test results
+            (each [_ result (ipairs summary.errors)]
+              (table.insert test-results result.ok))
+            ;; Organize and display results for this file
+            (let [organized (organize-test-results summary.errors)
+                  failed-tests (display-test-results organized colors)]
+              ;; Accumulate all failed tests
+              (each [_ failure (ipairs failed-tests)]
+                (table.insert all-failed-tests failure)))))))
     ;; Calculate total duration
     (let [end-time (get-time-ms)
           total-duration (- end-time start-time)]
