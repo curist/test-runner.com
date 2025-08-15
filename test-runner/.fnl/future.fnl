@@ -55,7 +55,9 @@
   (assert (= (type f) "function") "future.async requires a function")
 
   (let [(read-fd write-fd) (assert (rb.unix.pipe))
-        pid (assert (rb.unix.fork))]
+        _ (io.stderr:write (.. "DEBUG: Created pipe read-fd=" read-fd " write-fd=" write-fd "\n"))
+        pid (assert (rb.unix.fork))
+        _ (io.stderr:write (.. "DEBUG: Forked pid=" pid " parent-pid=" (rb.unix.getpid) "\n"))]
     (if (= 0 pid)
         ;; --- Child (Worker) Process ---
         (do
@@ -66,9 +68,12 @@
               (if err
                   ;; If JSON encoding fails, encode the error message
                   (let [error-payload (rb.encode-json {:error (tostring err)})]
+                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing error to fd=" write-fd "\n"))
                     (write-all write-fd error-payload))
                   ;; If JSON encoding succeeds, write the payload
-                  (write-all write-fd payload))))
+                  (do
+                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing success to fd=" write-fd "\n"))
+                    (write-all write-fd payload)))))
           (rb.unix.close write-fd)
           (rb.unix.exit 0))
         ;; --- Parent (Supervisor) Process ---
