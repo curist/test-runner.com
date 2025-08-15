@@ -119,6 +119,13 @@ The test runner includes a mocking system via `mocks.fnl` for dependency injecti
 ## File Structure
 
 - `test-runner/init.lua` - Entry point that loads Fennel and test runner
+- `test-runner/.fnl/` - Source code directory containing:
+  - `main.fnl` - Main entry point
+  - `test-runner.fnl` - Core test runner logic
+  - `assert.fnl` - Assertion library implementation
+  - `future.fnl` - Async/parallel execution utilities
+  - `mocks.fnl` - Mocking system
+  - `redbean.fnl` - Redbean API bindings
 - `test/` - Contains test files (`*_test.fnl`)
 - `artifacts/` - Build outputs (gitignored)
 - `Makefile` - Build configuration and commands

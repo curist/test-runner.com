@@ -96,18 +96,27 @@
                               group-result {:description test-entry.description
                                             :passed 0
                                             :failed 0
-                                            :total 0}]
+                                            :total 0}
+                              ;; Get timing function
+                              rb (require :redbean)
+                              get-time-ms (fn []
+                                            (let [(seconds nanoseconds) (rb.unix.clock_gettime rb.unix.CLOCK_MONOTONIC)]
+                                              (+ (* seconds 1000) (/ nanoseconds 1000000))))
+                              start-time (get-time-ms)]
                           ;; Set up isolated execution context in forked process
                           (set assert.state isolated-state)
                           (set assert.state.current-group group-result)
                           ;; Execute the test function
                           (test-entry.test-fn)
                           ;; Capture results from isolated state
-                          (set group-result.passed assert.state.passed)
-                          (set group-result.failed assert.state.failed) 
-                          (set group-result.total (+ assert.state.passed assert.state.failed))
-                          ;; Return the group result (this gets sent back to parent process)
-                          group-result)))
+                          (let [end-time (get-time-ms)
+                                duration (- end-time start-time)]
+                            (set group-result.passed assert.state.passed)
+                            (set group-result.failed assert.state.failed)
+                            (set group-result.total (+ assert.state.passed assert.state.failed))
+                            (set group-result.duration duration)
+                            ;; Return the group result (this gets sent back to parent process)
+                            group-result))))
         ;; Wait for all tests to complete and collect results
         results (icollect [_ task (ipairs test-tasks)]
                   (task:await))]
