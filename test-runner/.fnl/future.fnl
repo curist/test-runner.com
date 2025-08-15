@@ -28,14 +28,26 @@
 
 ;; I/O utilities for reliable pipe communication
 (fn write-all [fd data]
-  "Write all data to file descriptor, handling partial writes.
-   Loops until all bytes are written, since unix.write may return partial byte counts."
-  (var remaining data)
-  (while (> (length remaining) 0)
-    (let [written (assert (rb.unix.write fd remaining))]
-      (if (= written (length remaining))
-          (set remaining "")  ; All data written
-          (set remaining (string.sub remaining (+ written 1)))))))
+  "Writes all data to a file descriptor, handling short writes.
+   Returns total_written on success, or nil and error on failure."
+  (let [total-size (length data)]
+    (if (= total-size 0)
+        0  ; Nothing to write, success
+        (do
+          (var total-written 0)
+          (while (< total-written total-size)
+            (let [remaining-data (string.sub data (+ total-written 1))
+                  (wrote err) (rb.unix.write fd remaining-data)]
+              (if (not wrote)
+                  ; An error occurred. Check if it was EINTR and retry if so.
+                  ; EINTR means the call was interrupted by a signal.
+                  (when (not= err rb.unix.EINTR)
+                    ; A real error occurred, return it.
+                    (lua "return nil, err"))
+                  ; Successfully wrote 'wrote' bytes, update our total.
+                  (set total-written (+ total-written wrote)))))
+          ; The loop finished, so all data was written.
+          total-written))))
 
 (fn read-all [fd]
   "Read all data from file descriptor until EOF.
@@ -63,8 +75,11 @@
           (let [(ok result) (pcall f)]
             (let [payload (if ok
                               (rb.encode-json {:value result})
-                              (rb.encode-json {:error result}))]
-              (write-all write-fd payload)))
+                              (rb.encode-json {:error result}))
+                  (written err) (write-all write-fd payload)]
+              (when (not written)
+                (io.stderr:write (.. "write-all failed: " (tostring (or err "unknown error")) "\n"))
+                (rb.unix.exit 1))))
           (rb.unix.close write-fd)
           (rb.unix.exit 0))
         ;; --- Parent (Supervisor) Process ---
@@ -99,6 +114,8 @@
         ;; Read and decode the result from the pipe
         (let [payload (assert (read-all self.read_fd))
               decoded (rb.decode-json payload)]
+          (when (not decoded)
+            (error (.. "failed to decode JSON payload: " payload)))
           ;; --- Cleanup ---
           (rb.unix.close self.read_fd)
           (wait-for-process self.pid)

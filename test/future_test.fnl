@@ -230,21 +230,33 @@
        ;; Test write-all with small data
        (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
              test-data "hello world"
-             _ (future.__internal__.write-all write-fd test-data)
+             written (future.__internal__.write-all write-fd test-data)
              _ (rb.unix.close write-fd)
              result (future.__internal__.read-all read-fd)]
          (rb.unix.close read-fd)
+         (assert.= (length test-data) written)
          (assert.= test-data result))
        
        ;; Test write-all with large data (>4KB)
        (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
              large-data (string.rep "abcdefghij" 500)  ; 5000 bytes
-             _ (future.__internal__.write-all write-fd large-data)
+             written (future.__internal__.write-all write-fd large-data)
              _ (rb.unix.close write-fd)  ; Signal EOF
              result (future.__internal__.read-all read-fd)]
          (rb.unix.close read-fd)
+         (assert.= 5000 written)
          (assert.= 5000 (length result))
-         (assert.= large-data result))))
+         (assert.= large-data result))
+       
+       ;; Test write-all with empty data
+       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+             empty-data ""
+             written (future.__internal__.write-all write-fd empty-data)
+             _ (rb.unix.close write-fd)
+             result (future.__internal__.read-all read-fd)]
+         (rb.unix.close read-fd)
+         (assert.= 0 written)
+         (assert.= empty-data result))))
   
   (testing "read-all handles EOF and partial reads correctly"
     #(do
@@ -272,16 +284,27 @@
                       :nested {:deep {:value "success"}}}
            json-payload (rb.encode-json test-data)
            (read-fd write-fd) (_G.assert (rb.unix.pipe))
-           _ (future.__internal__.write-all write-fd json-payload)
+           written (future.__internal__.write-all write-fd json-payload)
            _ (rb.unix.close write-fd)
            received-json (future.__internal__.read-all read-fd)
            decoded-data (rb.decode-json received-json)]
        (rb.unix.close read-fd)
+       (assert.= (length json-payload) written)
        (assert.= (length test-data.numbers) (length decoded-data.numbers))
        (assert.= (. test-data.numbers 1) (. decoded-data.numbers 1))
        (assert.= (. test-data.numbers 100) (. decoded-data.numbers 100))
        (assert.= test-data.text decoded-data.text)
        (assert.= test-data.nested.deep.value decoded-data.nested.deep.value))))
+  
+  (testing "write-all error handling"
+    #(do
+       ;; Test writing to closed file descriptor
+       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+             _ (rb.unix.close write-fd)
+             (written err) (future.__internal__.write-all write-fd "test data")]
+         (rb.unix.close read-fd)
+         (assert.nil? written)
+         (assert.ok err "Expected error when writing to closed fd"))))
 
 {: test-basic-future-operations
  : test-future-combinators
