@@ -62,17 +62,24 @@
         ;; --- Child (Worker) Process ---
         (do
           (rb.unix.close read-fd) ;; Worker doesn't read
+          ;; Store expected write-fd for validation
+          (local expected-write-fd write-fd)
+          (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " expected write-fd=" expected-write-fd "\n"))
           (let [(ok result) (xpcall f debug.traceback)]
             (let [data (if ok {:value result} {:error result})
                   (payload err) (rb.encode-json data)]
+              ;; Validate we're writing to the correct FD
+              (when (not= write-fd expected-write-fd)
+                (io.stderr:write (.. "ERROR: Child " (rb.unix.getpid) " FD mismatch! Expected " expected-write-fd " but got " write-fd "\n"))
+                (rb.unix.exit 1))
               (if err
                   ;; If JSON encoding fails, encode the error message
                   (let [error-payload (rb.encode-json {:error (tostring err)})]
-                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing error to fd=" write-fd "\n"))
+                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing error to validated fd=" write-fd "\n"))
                     (write-all write-fd error-payload))
                   ;; If JSON encoding succeeds, write the payload
                   (do
-                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing success to fd=" write-fd "\n"))
+                    (io.stderr:write (.. "DEBUG: Child " (rb.unix.getpid) " writing success to validated fd=" write-fd "\n"))
                     (write-all write-fd payload)))))
           (rb.unix.close write-fd)
           (rb.unix.exit 0))
