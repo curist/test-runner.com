@@ -39,25 +39,25 @@
   (let [suite (require (file:gsub "%.fnl$" ""))
         results {:passed 0 :failed 0 :total 0 :errors [] :groups [] :timings []}]
     (when (= (type suite) :table)
-      (let [test-tasks (collect [name test-fn (pairs suite)]
-                         (let [test-name (if (= (type name) :string) name (tostring name))
-                               test-to-run (if (= (type name) :string) test-fn (. suite name))]
-                           (when (and test-to-run (test-name:match "^test-"))
-                             (values
-                               test-name
-                               (future.async
-                                 #(do
-                                    (let [start-time (get-time-ms)]
-                                      ;; Reset state and clear any previous collected tests
-                                      (set assert.state.groups [])
-                                      (set assert.state.collected-tests [])
-                                      ;; Run test function to collect testing blocks
-                                      (test-to-run)
-                                      ;; Execute collected tests in parallel and get results
-                                      (let [parallel-results (assert.execute-collected-tests)
-                                            end-time (get-time-ms)
-                                            duration (- end-time start-time)]
-                                        {:groups parallel-results :duration duration}))))))))]
+      (let [test-tasks
+            (collect [name test-fn (pairs suite)]
+              (let [test-name (if (= (type name) :string) name (tostring name))
+                    test-to-run (if (= (type name) :string) test-fn (. suite name))]
+                (when (and test-to-run (test-name:match "^test-"))
+                  (values
+                    test-name
+                    (future.async
+                      #(let [start-time (get-time-ms)]
+                         ;; Reset state and clear any previous collected tests
+                         (set assert.state.groups [])
+                         (set assert.state.collected-tests [])
+                         ;; Run test function to collect testing blocks
+                         (test-to-run)
+                         ;; Execute collected tests in parallel and get results
+                         (let [parallel-results (assert.execute-collected-tests)
+                               end-time (get-time-ms)
+                               duration (- end-time start-time)]
+                           {:groups parallel-results :duration duration})))))))]
         (each [name task (pairs test-tasks)]
           (set results.total (+ results.total 1))
           (let [(ok res) (pcall #(task:await))
@@ -69,14 +69,19 @@
                                res.duration
                                0)]
               ;; Record timing information
-              (table.insert results.timings {:name name :duration duration :file file})
+              (table.insert results.timings
+                {:name name :duration duration :file file})
               (if ok
                   (do
                     (set results.passed (+ results.passed 1))
-                    (table.insert results.errors {:ok true :name name :groups test-groups :duration duration}))
+                    (table.insert results.errors
+                      {:ok true :name name
+                       :groups test-groups :duration duration}))
                   (do
                     (set results.failed (+ results.failed 1))
-                    (table.insert results.errors {:ok false :name name :reason res :groups test-groups :duration duration}))))))))
+                    (table.insert results.errors
+                      {:ok false :name name :reason res
+                       :groups test-groups :duration duration}))))))))
     results))
 
 (fn organize-test-results [summary-errors]
@@ -84,7 +89,7 @@
   (let [test-groups {}
         ungrouped-results []]
     (each [_ result (ipairs summary-errors)]
-      (let [{: name : groups : duration} result]
+      (let [{: name : groups} result]
         (if (and groups (> (length groups) 0))
             ;; Group the results by test name, preserving duration info
             (do
@@ -127,11 +132,12 @@
 (fn display-test-results [organized-results colors]
   "Display organized test results with proper formatting"
   (let [{: test-groups : ungrouped-results} organized-results
-        {: green : red : reset : gray : yellow} colors
+        {: green : red : reset : yellow} colors
         failed-tests []
         all-durations (collect-all-durations organized-results)
         median-duration (or (calculate-median all-durations) 0)
-        threshold (math.max (* median-duration 2) 5)] ;; Show timing for tests > 2x median OR > 5ms
+        ;; Show timing for tests > 2x median OR > 5ms
+        threshold (math.max (* median-duration 2) 5)]
     ;; Display grouped results with headers
     (each [test-name groups (pairs test-groups)]
       (print (.. "▼ " test-name))
@@ -140,7 +146,9 @@
               group-color (if (> group.failed 0) red green)
               indent "  "
               duration (or group.duration 0)
-              timing-info (if (> duration threshold) (.. " " yellow (format-duration duration) reset) "")]
+              timing-info (if (> duration threshold)
+                              (.. " " yellow (format-duration duration) reset)
+                              "")]
           (print (.. indent "[" group-color group-status reset "] " 
                      group.description 
                      " (" group.passed "/" group.total ")" timing-info)))))
@@ -149,7 +157,9 @@
     (each [_ result (ipairs ungrouped-results)]
       (let [{: name : duration} result
             duration-str (if duration (format-duration duration) "")
-            timing-info (if (and duration (> duration threshold)) (.. " " yellow duration-str reset) "")]
+            timing-info (if (and duration (> duration threshold))
+                            (.. " " yellow duration-str reset)
+                            "")]
         (if result.ok
             (print (.. "[" green "PASS" reset "] " name timing-info))
             (let [{: reason} result]
@@ -168,8 +178,10 @@
         duration-str (format-duration total-duration)]
     (print)
     (if (= failed 0)
-        (print (.. "(" green passed reset "/" total ") " gray duration-str reset))
-        (print (.. "(" red passed reset "/" total ") " gray duration-str reset)))
+        (print (.. "(" green passed reset "/" total ") "
+                   gray duration-str reset))
+        (print (.. "(" red passed reset "/" total ") "
+                   gray duration-str reset)))
     (when (> failed 0)
       (print "\nFailed tests:")
       (each [_ failure (ipairs failed-tests)]
@@ -181,7 +193,8 @@
   (let [start-time (get-time-ms)
         test-tasks (icollect [_ file (ipairs tests)]
                      (future.async #(run-test-file file)))
-        colors {:green "\27[1;32m" :red "\27[1;31m" :reset "\27[0m" :gray "\27[90m" :yellow "\27[0;33m"}
+        colors {:green "\27[1;32m" :red "\27[1;31m" :reset "\27[0m"
+                :gray "\27[90m" :yellow "\27[0;33m"}
         test-results []
         all-failed-tests []]
     (each [i file (ipairs tests)]
