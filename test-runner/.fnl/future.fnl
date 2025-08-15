@@ -26,6 +26,29 @@
       (rb.unix.nanosleep 0 1000000))) ;; Sleep 1ms
   status)
 
+;; I/O utilities for reliable pipe communication
+(fn write-all [fd data]
+  "Write all data to file descriptor, handling partial writes.
+   Loops until all bytes are written, since unix.write may return partial byte counts."
+  (var remaining data)
+  (while (> (length remaining) 0)
+    (let [written (assert (rb.unix.write fd remaining))]
+      (if (= written (length remaining))
+          (set remaining "")  ; All data written
+          (set remaining (string.sub remaining (+ written 1)))))))
+
+(fn read-all [fd]
+  "Read all data from file descriptor until EOF.
+   Accumulates chunks until unix.read returns empty string (EOF)."
+  (var complete-data "")
+  (var done false)
+  (while (not done)
+    (let [(ok chunk) (pcall rb.unix.read fd)]
+      (if (and ok chunk (not= chunk ""))
+          (set complete-data (.. complete-data chunk))
+          (set done true))))
+  complete-data)
+
 (fn Future.async [f]
   "Runs a function in a separate process and returns a future object.
    The provided function `f` should return a single, JSON-serializable value."
@@ -41,7 +64,7 @@
             (let [payload (if ok
                               (rb.encode-json {:value result})
                               (rb.encode-json {:error result}))]
-              (rb.unix.write write-fd payload)))
+              (write-all write-fd payload)))
           (rb.unix.close write-fd)
           (rb.unix.exit 0))
         ;; --- Parent (Supervisor) Process ---
@@ -74,7 +97,7 @@
           (self:cancel)
           (error "timeout"))
         ;; Read and decode the result from the pipe
-        (let [payload (assert (rb.unix.read self.read_fd))
+        (let [payload (assert (read-all self.read_fd))
               decoded (rb.decode-json payload)]
           ;; --- Cleanup ---
           (rb.unix.close self.read_fd)
@@ -262,5 +285,10 @@
   (let [sec (math.floor (/ ms 1000))
         nsec (* (% ms 1000) 1000000)]
     (Future.nanosleep sec nsec)))
+
+;; Export internal utilities for testing
+(set Future.__internal__
+  {: write-all
+   : read-all})
 
 Future
