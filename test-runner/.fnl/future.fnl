@@ -62,11 +62,13 @@
           (rb.unix.close read-fd) ;; Worker doesn't read
           (let [(ok result) (xpcall f debug.traceback)]
             (let [data (if ok {:value result} {:error result})
-                  (payload err) (rb.encode-json data)
-                  payload (if err
-                              (rb.encode-json {:error (tostring err)})
-                              payload)]
-              (write-all write-fd payload)))
+                  (payload err) (rb.encode-json data)]
+              (if err
+                  ;; If JSON encoding fails, encode the error message
+                  (let [error-payload (rb.encode-json {:error (tostring err)})]
+                    (write-all write-fd error-payload))
+                  ;; If JSON encoding succeeds, write the payload
+                  (write-all write-fd payload))))
           (rb.unix.close write-fd)
           (rb.unix.exit 0))
         ;; --- Parent (Supervisor) Process ---
