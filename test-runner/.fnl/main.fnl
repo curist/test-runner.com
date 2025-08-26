@@ -1,5 +1,6 @@
 (local rb (require :redbean))
 (local test-runner (require :test-runner))
+(local fennel (require :fennel))
 
 (fn show-help []
   "Display help information from embedded USAGE.md"
@@ -17,7 +18,7 @@
         (print (.. "test-runner.com " (version:gsub "\n" "")))
         (print "test-runner.com (dev)"))
     (print (.. "redbean version: " (redbean-version:gsub "\n" "")))
-    (print "fennel version: 1.5.3"))
+    (print (.. "fennel version: " fennel.version)))
   (os.exit 0))
 
 (fn parse-flags [args]

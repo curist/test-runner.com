@@ -164,14 +164,10 @@
                             "")]
         (if result.ok
             (print (.. "[" green "PASS" reset "] " name timing-info))
-            (let [{: reason} result
-                  ;; Clean up error message by removing "runtime error:" prefix
-                  clean-reason (if (reason:match "^runtime error: (.+)")
-                                   (reason:match "^runtime error: (.+)")
-                                   reason)]
+            (let [{: reason} result]
               (print (.. "[" red "FAIL" reset "] " name timing-info))
-              (print (.. "  " clean-reason))
-              (table.insert failed-tests {: name :reason clean-reason})))))
+              (print (.. "  " reason))
+              (table.insert failed-tests {: name : reason})))))
     failed-tests))
 
 
