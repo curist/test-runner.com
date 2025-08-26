@@ -75,7 +75,9 @@
           (let [(ok result) (pcall f)]
             (let [payload (if ok
                               (rb.encode-json {:value result})
-                              (rb.encode-json {:error result}))
+                              ;; Capture stack trace for errors
+                              (let [traceback (debug.traceback (tostring result))]
+                                (rb.encode-json {:error result :traceback traceback})))
                   (written err) (write-all write-fd payload)]
               (when (not written)
                 (io.stderr:write (.. "write-all failed: " (tostring (or err "unknown error")) "\n"))
@@ -123,8 +125,12 @@
           (set self.status :resolved)
           (if decoded.error
               (do
-                (set self.error decoded.error)
-                (error self.error 0))
+                ;; For table errors, preserve original object; for strings, use enhanced traceback
+                (let [error-to-throw (if (and decoded.traceback (= (type decoded.error) "string"))
+                                       decoded.traceback
+                                       decoded.error)]
+                  (set self.error decoded.error) 
+                  (error error-to-throw 0)))
               (do
                 (set self.result decoded.value)
                 self.result))))))

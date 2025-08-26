@@ -51,6 +51,8 @@
                          ;; Reset state and clear any previous collected tests
                          (set assert.state.groups [])
                          (set assert.state.collected-tests [])
+                         ;; Set current file for error reporting
+                         (set assert.state.current-file file)
                          ;; Run test function to collect testing blocks
                          (test-to-run)
                          ;; Execute collected tests in parallel and get results

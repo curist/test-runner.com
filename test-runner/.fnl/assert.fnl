@@ -1,7 +1,7 @@
 (local fennel (require :fennel))
 
 (local assert {})
-(set assert.state {:passed 0 :failed 0 :groups [] :current-group nil :collected-tests []})
+(set assert.state {:passed 0 :failed 0 :groups [] :current-group nil :collected-tests [] :current-file nil})
 
 (fn deep-equal [a b]
   (if (and (= (type a) :table) (= (type b) :table))
@@ -32,7 +32,22 @@
       (do
         (set assert.state.failed (+ assert.state.failed 1))
         (update-group-counts false)
-        (error error-message 3))))
+        ;; Include context about which test is failing
+        (let [file-context (if assert.state.current-file
+                             (.. " (in " assert.state.current-file ")")
+                             "")
+              group-context (if assert.state.current-group
+                              (.. " (in test: " assert.state.current-group.description ")")
+                              "")
+              ;; Extract test file location from stack trace
+              full-traceback (debug.traceback)
+              test-location (or (full-traceback:match "([^/\n]+_test%.fnl:%d+)")
+                               (full-traceback:match "([^/\n]+%.fnl:%d+)"))
+              location-info (if test-location
+                              (.. " at " test-location)
+                              "")
+              enhanced-message (.. error-message group-context file-context location-info)]
+          (error enhanced-message 3)))))
 
 (fn assert.ok [v ?message]
   (handle-assertion v (or ?message "assertion failed")))
@@ -92,7 +107,7 @@
         test-tasks (icollect [_ test-entry (ipairs assert.state.collected-tests)]
                      (future.async 
                        #(let [;; Create isolated state for this forked process
-                              isolated-state {:passed 0 :failed 0 :groups [] :current-group nil :collected-tests []}
+                              isolated-state {:passed 0 :failed 0 :groups [] :current-group nil :collected-tests [] :current-file assert.state.current-file}
                               group-result {:description test-entry.description
                                             :passed 0
                                             :failed 0
@@ -138,7 +153,8 @@
   (set assert.state.failed 0)
   (set assert.state.groups [])
   (set assert.state.current-group nil)
-  (set assert.state.collected-tests []))
+  (set assert.state.collected-tests [])
+  (set assert.state.current-file nil))
 
 (fn assert.restore-state [state]
   "Restore assert state from a previous get-results snapshot"
