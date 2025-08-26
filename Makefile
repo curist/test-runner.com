@@ -16,6 +16,14 @@ test-runner/.lua/fennel.lua:
 	mkdir -p $(@D)
 	curl -o $@ https://fennel-lang.org/downloads/fennel-${FENNEL_VERSION}.lua
 
+redbean-fennel/fennel:
+	curl -o $@ https://fennel-lang.org/downloads/fennel-${FENNEL_VERSION}
+
+artifacts/redbean-fennel: artifacts/redbean.dev.com redbean-fennel/fennel
+	cp $< redbean.com
+	cd redbean-fennel && zip -r ../redbean.com .
+	mv redbean.com $@ 
+
 artifacts/test-runner.com: artifacts/redbean.dev.com test-runner/.lua/fennel.lua test-runner/.fnl/redbean.fnl $(TEST_RUNNER_SRC) USAGE.md artifacts/redbean.version.txt
 	cp $< redbean.com
 	cd test-runner && zip -r ../redbean.com .
