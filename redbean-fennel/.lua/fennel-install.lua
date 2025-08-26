@@ -2,6 +2,7 @@ local fennel = require("fennel")
 
 fennel.path = fennel.path .. ";/zip/.fnl/?.fnl"
 fennel.path = fennel.path .. ";/zip/?.fnl"
+fennel.path = fennel.path .. ";test-runner/.fnl/?.fnl"
 
 fennel.install({ correlate = true })
 
