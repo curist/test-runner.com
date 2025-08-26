@@ -19,8 +19,9 @@ test-runner/.lua/fennel.lua:
 redbean-fennel/fennel:
 	curl -o $@ https://fennel-lang.org/downloads/fennel-${FENNEL_VERSION}
 
-artifacts/redbean-fennel: artifacts/redbean.dev.com redbean-fennel/fennel
+artifacts/redbean-fennel: artifacts/redbean.dev.com redbean-fennel/fennel test-runner/.lua/fennel.lua
 	cp $< redbean.com
+	cp test-runner/.lua/fennel.lua redbean-fennel/.lua/fennel.lua
 	cd redbean-fennel && zip -r ../redbean.com .
 	mv redbean.com $@ 
 
