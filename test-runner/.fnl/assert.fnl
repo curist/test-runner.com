@@ -32,21 +32,17 @@
       (do
         (set assert.state.failed (+ assert.state.failed 1))
         (update-group-counts false)
-        ;; Include context about which test is failing
-        (let [file-context (if assert.state.current-file
-                             (.. " (in " assert.state.current-file ")")
-                             "")
-              group-context (if assert.state.current-group
-                              (.. " (in test: " assert.state.current-group.description ")")
-                              "")
-              ;; Extract test file location from stack trace
+        ;; Create clean, scannable error message
+        (let [;; Extract test file location from stack trace
               full-traceback (debug.traceback)
-              test-location (or (full-traceback:match "([^/\n]+_test%.fnl:%d+)")
-                               (full-traceback:match "([^/\n]+%.fnl:%d+)"))
-              location-info (if test-location
-                              (.. " at " test-location)
-                              "")
-              enhanced-message (.. error-message group-context file-context location-info)]
+              test-location (full-traceback:match "([^/\n]+_test%.fnl:%d+)")
+              ;; Add test context if available
+              test-context (if assert.state.current-group
+                               (.. " (" assert.state.current-group.description ")")
+                               "")
+              ;; Format: "assertion failed (basic async execution and error handling) at future_test.fnl:19"
+              location-suffix (if test-location (.. " at " test-location) "")
+              enhanced-message (.. error-message test-context location-suffix)]
           (error enhanced-message 3)))))
 
 (fn assert.ok [v ?message]

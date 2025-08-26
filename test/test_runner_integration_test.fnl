@@ -69,7 +69,7 @@
  (fn []
    "Test that demonstrates the nil decoded JSON issue and verifies rb.decode-json behavior"
    (local rb (require :redbean))
-   
+
    ;; First, verify that rb.decode-json returns nil for invalid JSON
    (let [invalid-cases ["invalid-json-{broken"
                         "{"
@@ -81,7 +81,7 @@
          ;; This demonstrates that rb.decode-json can return nil
          (when (not (= result nil))
            (assert.nil? result (.. "Expected nil for invalid JSON: " (tostring invalid-json)))))))
-   
+
    ;; This test documents the issue: when a child process in future.async
    ;; writes corrupted data to the pipe (maybe due to a crash or memory corruption),
    ;; rb.decode-json returns nil, and future.fnl:84 tries to access decoded.error
