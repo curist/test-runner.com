@@ -24,22 +24,6 @@
           (set assert.state.current-group.total (+ assert.state.current-group.total 1))))))
 
 
-(fn find-error-level []
-  "Find the appropriate stack level for error() to point to test code"
-  (var level 1)
-  (var found-level nil)
-  (while (and (not found-level) level)
-    (let [info (debug.getinfo level "Sl")]
-      (if (and info info.source)
-          (let [source info.source
-                clean-source (if (= (string.sub source 1 1) "@")
-                                 (string.sub source 2)
-                                 source)]
-            (if (string.match clean-source "_test%.fnl$")
-                (set found-level level)
-                (set level (+ level 1))))
-          (set level nil))))
-  (or found-level 2))
 
 (fn handle-assertion [passed? error-message]
   "Common assertion handler that updates counters and throws on failure"
@@ -50,37 +34,15 @@
       (do
         (set assert.state.failed (+ assert.state.failed 1))
         (update-group-counts false)
-        ;; Capture complete context at source - no need for pattern matching later
+        ;; Build complete error message with available context
         (let [test-file (or assert.state.current-file "unknown")
-              ;; Get line number directly from debug info, walking up the stack
-              line-number (do
-                            (var level 2) ;; Start at level 2 to skip handle-assertion itself
-                            (var found-line nil)
-                            (while (and (not found-line) level (< level 15))
-                              (let [info (debug.getinfo level "Sl")]
-                                (if (and info info.source info.currentline)
-                                    (let [source info.source
-                                          clean-source (if (= (string.sub source 1 1) "@")
-                                                           (string.sub source 2)
-                                                           source)]
-                                      ;; Look for test files or any .fnl files not in the framework
-                                      (if (or (string.match clean-source "_test%.fnl$")
-                                              (and (string.match clean-source "%.fnl$")
-                                                   (not (string.match clean-source "/zip/"))
-                                                   (not (string.match clean-source "^%./"))))
-                                          (set found-line info.currentline)
-                                          (set level (+ level 1))))
-                                    (set level (+ level 1)))))
-                            (or found-line "?"))
               ;; Add test context if available  
               test-context (if assert.state.current-group
                                (.. " (" assert.state.current-group.description ")")
                                "")
-              ;; Build complete error message with all context
-              complete-message (.. error-message test-context " at " test-file ":" line-number)
-              ;; Find appropriate stack level to point error to test code
-              error-level (find-error-level)]
-          (error complete-message error-level)))))
+              ;; Simple format: focus on test context rather than precise line numbers
+              complete-message (.. error-message test-context " in " test-file)]
+          (error complete-message 0)))))
 
 (fn assert.ok [v ?message]
   (handle-assertion v (or ?message "assertion failed")))
