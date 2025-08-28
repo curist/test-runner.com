@@ -3,6 +3,8 @@ local fennel = require("fennel")
 fennel.path = fennel.path .. ";/zip/.fnl/?.fnl"
 fennel.path = fennel.path .. ";/zip/?.fnl"
 
+fennel["macro-path"] = "/zip/.fnl-macro/?.fnl"
+
 fennel.install({ correlate = true })
 
 -- Override debug.traceback with Fennel's traceback for better stack traces

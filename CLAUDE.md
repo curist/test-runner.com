@@ -56,22 +56,38 @@ Test files must follow this pattern:
 - Values are functions containing assertions
 
 ```fennel
+(local test (require :test))
+(import-macros asserts :asserts)
+
 {:test-example-name
- (fn [] (assert.= (+ 1 1) 2))
+ (fn [] (asserts.= (+ 1 1) 2))
  :test-another-test
- (fn [] (assert.ok "truthy value"))}
+ (fn [] (asserts.ok "truthy value"))}
 ```
 
-### Assertion Library
+### Assertion System
 
-Available assertion functions:
-- `(assert.ok v ?msg)` - truthy check
-- `(assert.falsy v ?msg)` - falsy check  
-- `(assert.= a b)` - equality
-- `(assert.not= a b)` - inequality
-- `(assert.nil? v)` - nil check
-- `(assert.deep= a b)` - deep table equality
-- `(testing "description" test-fn)` - grouped assertions
+The test runner uses a hybrid approach with macros and modules:
+
+**Assertion Macros** (in `test-runner/.fnl-macro/asserts.fnl`):
+- `(asserts.ok v ?msg)` - truthy check
+- `(asserts.falsy v ?msg)` - falsy check  
+- `(asserts.= a b)` - equality
+- `(asserts.not= a b)` - inequality
+- `(asserts.nil? v)` - nil check
+- `(asserts.deep= a b)` - deep table equality
+- `(asserts.match pattern text)` - pattern matching
+- `(asserts.throws fn ?pattern)` - error throwing check
+
+**Test Utilities** (from `test.fnl` module):
+- `(testing "description" test-fn)` - grouped assertions with parallel execution
+
+To use assertions, import both the module and macros:
+```fennel
+(local test (require :test))
+(import-macros asserts :asserts)
+(local {: testing} test)
+```
 
 ### Mocking System
 
@@ -91,7 +107,7 @@ The test runner includes a mocking system via `mocks.fnl` for dependency injecti
   (with-mocked-dependencies
     (fn [module]
       (testing "some behavior"
-        #(assert.= expected (module.function))))))
+        #(asserts.= expected (module.function))))))
 ```
 
 **Key principles:**
@@ -122,10 +138,12 @@ The test runner includes a mocking system via `mocks.fnl` for dependency injecti
 - `test-runner/.fnl/` - Source code directory containing:
   - `main.fnl` - Main entry point
   - `test-runner.fnl` - Core test runner logic
-  - `assert.fnl` - Assertion library implementation
+  - `test.fnl` - Test state management and utilities
   - `future.fnl` - Async/parallel execution utilities
   - `mocks.fnl` - Mocking system
   - `redbean.fnl` - Redbean API bindings
+- `test-runner/.fnl-macro/` - Macro directory containing:
+  - `asserts.fnl` - Assertion macro implementations with accurate line number reporting
 - `test/` - Contains test files (`*_test.fnl`)
 - `artifacts/` - Build outputs (gitignored)
 - `Makefile` - Build configuration and commands

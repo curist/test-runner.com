@@ -4,6 +4,8 @@ fennel.path = fennel.path .. ";/zip/.fnl/?.fnl"
 fennel.path = fennel.path .. ";/zip/?.fnl"
 fennel.path = fennel.path .. ";test-runner/.fnl/?.fnl"
 
+fennel["macro-path"] = "test-runner/.fnl-macro/?.fnl"
+
 fennel.install({ correlate = true })
 
 -- Override debug.traceback with Fennel's traceback for better stack traces

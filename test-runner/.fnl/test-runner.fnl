@@ -1,6 +1,6 @@
 (local rb (require :redbean))
 (local future (require :future))
-(local assert (require :assert))
+(local test (require :test))
 
 (fn get-time-ms []
   "Get current time in milliseconds using high-resolution monotonic clock"
@@ -49,14 +49,14 @@
                     (future.async
                       #(let [start-time (get-time-ms)]
                          ;; Reset state and clear any previous collected tests
-                         (set assert.state.groups [])
-                         (set assert.state.collected-tests [])
+                         (set test.state.groups [])
+                         (set test.state.collected-tests [])
                          ;; Set current file for error reporting
-                         (set assert.state.current-file file)
+                         (set test.state.current-file file)
                          ;; Run test function to collect testing blocks
                          (test-to-run)
                          ;; Execute collected tests in parallel and get results
-                         (let [parallel-results (assert.execute-collected-tests)
+                         (let [parallel-results (test.execute-collected-tests)
                                end-time (get-time-ms)
                                duration (- end-time start-time)]
                            {:groups parallel-results :duration duration})))))))]
@@ -98,11 +98,43 @@
               (when (not (. test-groups name))
                 (set (. test-groups name) []))
               (each [_ group (ipairs groups)]
-                ;; Groups now have their own individual timing from assert.fnl
+                ;; Groups now have their own individual timing from test.fnl
                 (table.insert (. test-groups name) group)))
             ;; Keep ungrouped results
             (table.insert ungrouped-results result))))
     {: test-groups : ungrouped-results}))
+
+(fn simplify-error-message [error-message]
+  "Extract the relevant test file location from a stack trace"
+  (if (error-message:find "stack traceback:")
+      ;; Extract just the first relevant line from the stack trace
+      (let [lines (icollect [line (error-message:gmatch "[^\n]+")]
+                    line)]
+        ;; Find the first line that contains a test file path
+        (var simplified nil)
+        (each [_ line (ipairs lines)]
+          (when (and (not simplified) 
+                     (line:find "%.fnl:") 
+                     (not= line "")
+                     (not (line:find "/zip/"))  ;; Skip internal zip paths
+                     (not (line:find "in function 'error'")))
+            (set simplified line)))
+        ;; If we found a relevant line, use it; otherwise fall back to the original
+        (if simplified
+            (let [;; Extract the main error message (before "stack traceback:")
+                  main-msg (error-message:match "^(.-)stack traceback:")
+                  ;; Clean up the file line
+                  clean-line
+                  (-> simplified
+                      (: :gsub  "^%s*" "")
+                      (: :gsub  "%s*$" "")
+                      (: :gsub "^%s*[./]+" "")
+                      (: :gsub ": in function.*$" ""))
+                  ]
+              (.. clean-line "\n" (or main-msg "")))
+            error-message))
+      ;; No stack trace, return as-is
+      error-message))
 
 (fn calculate-median [durations]
   "Calculate median duration from a list of durations"
@@ -164,10 +196,11 @@
                             "")]
         (if result.ok
             (print (.. "[" green "PASS" reset "] " name timing-info))
-            (let [{: reason} result]
+            (let [{: reason} result
+                  simplified-reason (simplify-error-message reason)]
               (print (.. "[" red "FAIL" reset "] " name timing-info))
-              (print (.. "  " reason))
-              (table.insert failed-tests {: name : reason})))))
+              (print (.. "  " simplified-reason))
+              (table.insert failed-tests {: name :reason simplified-reason})))))
     failed-tests))
 
 
@@ -191,7 +224,7 @@
       (os.exit 1))))
 
 (fn run-tests [tests]
-  (assert.reset)
+  (test.reset)
   (let [start-time (get-time-ms)
         rb (require :redbean)
         cpu-count (rb.get-cpu-count)

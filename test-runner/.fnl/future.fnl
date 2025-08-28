@@ -10,7 +10,7 @@
 
 (fn is-future? [value]
   "Check if a value is a Future-like object."
-  (and (= (type value) "table") 
+  (and (= (type value) "table")
        (getmetatable value)
        (let [name (. (getmetatable value) :__name)]
          (or (= name "Future")
@@ -61,6 +61,7 @@
           (set done true))))
   complete-data)
 
+
 (fn Future.async [f]
   "Runs a function in a separate process and returns a future object.
    The provided function `f` should return a single, JSON-serializable value."
@@ -72,12 +73,13 @@
         ;; --- Child (Worker) Process ---
         (do
           (rb.unix.close read-fd) ;; Worker doesn't read
-          (let [(ok result) (pcall f)]
+
+          ;; Simple error handling - context already captured at source
+          (let [(ok result) (xpcall f debug.traceback)]
             (let [payload (if ok
                               (rb.encode-json {:value result})
-                              ;; Capture stack trace for errors
-                              (let [traceback (debug.traceback (tostring result))]
-                                (rb.encode-json {:error result :traceback traceback})))
+                              ;; Simple error serialization - complete context already in error message
+                              (rb.encode-json {:error result}))
                   (written err) (write-all write-fd payload)]
               (when (not written)
                 (io.stderr:write (.. "write-all failed: " (tostring (or err "unknown error")) "\n"))
@@ -93,9 +95,16 @@
                       :result nil}]
             (setmetatable self Future))))))
 
+(fn format-error [error-data]
+  "Pass through complete error messages (context already captured at source)"
+  (if (= (type error-data.error) "string")
+      ;; Error message already contains complete context from handle-assertion
+      error-data.error
+      ;; Fallback for non-string errors
+      (tostring error-data.error)))
+
 (fn Future.await [self timeout-ms]
-  "Waits for the future to complete and returns its result.
-   This function will block until the worker process finishes or the timeout (in ms) is reached."
+  "Waits for the future to complete and returns its result."
   (assert (= (getmetatable self) Future) "await must be called on a Future")
   (if (= self.status :resolved)
       (if self.error
@@ -124,13 +133,9 @@
           ;; --- Cache and return result ---
           (set self.status :resolved)
           (if decoded.error
-              (do
-                ;; For table errors, preserve original object; for strings, use enhanced traceback
-                (let [error-to-throw (if (and decoded.traceback (= (type decoded.error) "string"))
-                                       decoded.traceback
-                                       decoded.error)]
-                  (set self.error decoded.error) 
-                  (error error-to-throw 0)))
+              (let [error-to-throw (format-error decoded)]
+                (set self.error decoded.error)
+                (error error-to-throw 0))
               (do
                 (set self.result decoded.value)
                 self.result))))))
