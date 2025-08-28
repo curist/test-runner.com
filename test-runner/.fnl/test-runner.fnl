@@ -1,6 +1,6 @@
 (local rb (require :redbean))
 (local future (require :future))
-(local assert (require :assert))
+(local assert-mod (require :assert))
 
 (fn get-time-ms []
   "Get current time in milliseconds using high-resolution monotonic clock"
@@ -49,14 +49,14 @@
                     (future.async
                       #(let [start-time (get-time-ms)]
                          ;; Reset state and clear any previous collected tests
-                         (set assert.state.groups [])
-                         (set assert.state.collected-tests [])
+                         (set assert-mod.state.groups [])
+                         (set assert-mod.state.collected-tests [])
                          ;; Set current file for error reporting
-                         (set assert.state.current-file file)
+                         (set assert-mod.state.current-file file)
                          ;; Run test function to collect testing blocks
                          (test-to-run)
                          ;; Execute collected tests in parallel and get results
-                         (let [parallel-results (assert.execute-collected-tests)
+                         (let [parallel-results (assert-mod.execute-collected-tests)
                                end-time (get-time-ms)
                                duration (- end-time start-time)]
                            {:groups parallel-results :duration duration})))))))]
@@ -98,7 +98,7 @@
               (when (not (. test-groups name))
                 (set (. test-groups name) []))
               (each [_ group (ipairs groups)]
-                ;; Groups now have their own individual timing from assert.fnl
+                ;; Groups now have their own individual timing from assert-mod.fnl
                 (table.insert (. test-groups name) group)))
             ;; Keep ungrouped results
             (table.insert ungrouped-results result))))
@@ -191,7 +191,7 @@
       (os.exit 1))))
 
 (fn run-tests [tests]
-  (assert.reset)
+  (assert-mod.reset)
   (let [start-time (get-time-ms)
         rb (require :redbean)
         cpu-count (rb.get-cpu-count)
