@@ -25,7 +25,7 @@ artifacts/redbean-fennel: artifacts/redbean.dev.com redbean-fennel/fennel test-r
 	cd redbean-fennel && zip -r ../redbean.com .
 	mv redbean.com $@ 
 
-artifacts/test-runner.com: artifacts/redbean.dev.com test-runner/.lua/fennel.lua test-runner/.fnl/redbean.fnl $(TEST_RUNNER_SRC) USAGE.md artifacts/redbean.version.txt
+artifacts/test-runner.com: artifacts/redbean.dev.com test-runner/.lua/fennel.lua $(TEST_RUNNER_SRC) USAGE.md artifacts/redbean.version.txt
 	cp $< redbean.com
 	cd test-runner && zip -r ../redbean.com .
 	zip -j redbean.com LICENSE USAGE.md artifacts/redbean.version.txt

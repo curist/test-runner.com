@@ -1,5 +1,5 @@
-(local rb (require :redbean))
-(local future (require :future))
+(local rb (require :__testrunner__.redbean))
+(local future (require :__testrunner__.future))
 (local test (require :test))
 
 (fn get-time-ms []
@@ -226,7 +226,6 @@
 (fn run-tests [tests]
   (test.reset)
   (let [start-time (get-time-ms)
-        rb (require :redbean)
         cpu-count (rb.get-cpu-count)
         ;; Use CPU count to limit parallelism, with reasonable bounds
         max-parallel (math.max (math.min cpu-count 16) 1)

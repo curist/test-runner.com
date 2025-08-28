@@ -1,7 +1,7 @@
 (local test (require :test))
 (import-macros asserts :asserts)
-(local future (require :future))
-(local rb (require :redbean))
+(local future (require :__testrunner__.future))
+(local rb (require :__testrunner__.redbean))
 (local {: testing} test)
 
 (fn test-basic-future-operations []

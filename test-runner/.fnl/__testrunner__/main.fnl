@@ -1,5 +1,5 @@
-(local rb (require :redbean))
-(local test-runner (require :test-runner))
+(local rb (require :__testrunner__.redbean))
+(local test-runner (require :__testrunner__.test-runner))
 (local fennel (require :fennel))
 
 (fn show-help []

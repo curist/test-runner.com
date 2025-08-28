@@ -1,5 +1,6 @@
 (import-macros asserts :asserts)
-(local test-runner (require :test-runner))
+(local test-runner (require :__testrunner__.test-runner))
+(local rb (require :__testrunner__.redbean))
 
 {:test-walk-finds-test-files
  (fn []
@@ -68,7 +69,6 @@
  :test-future-await-handles-nil-decoded
  (fn []
    "Test that demonstrates the nil decoded JSON issue and verifies rb.decode-json behavior"
-   (local rb (require :redbean))
 
    ;; First, verify that rb.decode-json returns nil for invalid JSON
    (let [invalid-cases ["invalid-json-{broken"

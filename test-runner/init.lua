@@ -1,2 +1,2 @@
 require("fennel-install")
-require("main")
+require("__testrunner__.main")

@@ -1,4 +1,4 @@
-(local test-runner (require :test-runner))
+(local test-runner (require :__testrunner__.test-runner))
 (import-macros asserts :asserts)
 
 (fn test-organize-test-results-with-groups []

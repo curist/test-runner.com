@@ -1,3 +1,6 @@
+(local rb (require :__testrunner__.redbean))
+(local future (require :__testrunner__.future))
+
 (local test
   {:state
    {:passed 0 :failed 0 :groups [] :current-group nil
@@ -51,8 +54,7 @@
 
 (fn test.execute-collected-tests []
   "Execute all collected testing functions in parallel and return organized results"
-  (let [future (require :future)
-        test-tasks
+  (let [test-tasks
         (icollect [_ test-entry (ipairs test.state.collected-tests)]
           (future.async 
             #(let [;; Create isolated state for this forked process
@@ -64,7 +66,6 @@
                                  :failed 0
                                  :total 0}
                    ;; Get timing function
-                   rb (require :redbean)
                    get-time-ms #(let [(seconds nanoseconds)
                                       (rb.unix.clock_gettime rb.unix.CLOCK_MONOTONIC)]
                                   (+ (* seconds 1000) (/ nanoseconds 1000000)))

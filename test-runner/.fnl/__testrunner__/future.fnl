@@ -1,6 +1,6 @@
 ;; A simple Future implementation for concurrent tasks using fork/pipe.
 
-(local rb (require :redbean))
+(local rb (require :__testrunner__.redbean))
 
 (local Future {:__name "Future"})
 (set Future.__index Future)
