@@ -1,5 +1,7 @@
-(local test {})
-(set test.state {:passed 0 :failed 0 :groups [] :current-group nil :collected-tests [] :current-file nil})
+(local test
+  {:state
+   {:passed 0 :failed 0 :groups [] :current-group nil
+    :collected-tests [] :current-file nil}})
 
 (fn test.deep-equal [a b]
   (if (and (= (type a) :table) (= (type b) :table))
@@ -50,34 +52,37 @@
 (fn test.execute-collected-tests []
   "Execute all collected testing functions in parallel and return organized results"
   (let [future (require :future)
-        test-tasks (icollect [_ test-entry (ipairs test.state.collected-tests)]
-                     (future.async 
-                       #(let [;; Create isolated state for this forked process
-                              isolated-state {:passed 0 :failed 0 :groups [] :current-group nil :collected-tests [] :current-file test.state.current-file}
-                              group-result {:description test-entry.description
-                                            :passed 0
-                                            :failed 0
-                                            :total 0}
-                              ;; Get timing function
-                              rb (require :redbean)
-                              get-time-ms (fn []
-                                            (let [(seconds nanoseconds) (rb.unix.clock_gettime rb.unix.CLOCK_MONOTONIC)]
-                                              (+ (* seconds 1000) (/ nanoseconds 1000000))))
-                              start-time (get-time-ms)]
-                          ;; Set up isolated execution context in forked process
-                          (set test.state isolated-state)
-                          (set test.state.current-group group-result)
-                          ;; Execute the test function
-                          (test-entry.test-fn)
-                          ;; Capture results from isolated state
-                          (let [end-time (get-time-ms)
-                                duration (- end-time start-time)]
-                            (set group-result.passed test.state.passed)
-                            (set group-result.failed test.state.failed)
-                            (set group-result.total (+ test.state.passed test.state.failed))
-                            (set group-result.duration duration)
-                            ;; Return the group result (this gets sent back to parent process)
-                            group-result))))
+        test-tasks
+        (icollect [_ test-entry (ipairs test.state.collected-tests)]
+          (future.async 
+            #(let [;; Create isolated state for this forked process
+                   isolated-state
+                   {:passed 0 :failed 0 :groups [] :current-group nil
+                    :collected-tests [] :current-file test.state.current-file}
+                   group-result {:description test-entry.description
+                                 :passed 0
+                                 :failed 0
+                                 :total 0}
+                   ;; Get timing function
+                   rb (require :redbean)
+                   get-time-ms #(let [(seconds nanoseconds)
+                                      (rb.unix.clock_gettime rb.unix.CLOCK_MONOTONIC)]
+                                  (+ (* seconds 1000) (/ nanoseconds 1000000)))
+                   start-time (get-time-ms)]
+               ;; Set up isolated execution context in forked process
+               (set test.state isolated-state)
+               (set test.state.current-group group-result)
+               ;; Execute the test function
+               (test-entry.test-fn)
+               ;; Capture results from isolated state
+               (let [end-time (get-time-ms)
+                     duration (- end-time start-time)]
+                 (set group-result.passed test.state.passed)
+                 (set group-result.failed test.state.failed)
+                 (set group-result.total (+ test.state.passed test.state.failed))
+                 (set group-result.duration duration)
+                 ;; Return the group result (this gets sent back to parent process)
+                 group-result))))
         ;; Wait for all tests to complete and collect results
         results (icollect [_ task (ipairs test-tasks)]
                   (task:await))]

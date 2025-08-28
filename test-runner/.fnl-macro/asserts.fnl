@@ -7,47 +7,46 @@
          passed?# ,v
          msg# (or ,?message "assertion failed")]
      (test#.handle-assertion passed?#)
-     (assert passed?# msg#)))
+     (when (not passed?#) (error msg# 2))))
 
 (fn asserts.= [a b]
   `(let [test# (require :test)
          passed?# (= ,a ,b)]
      (test#.handle-assertion passed?#)
-     (assert passed?# (.. (tostring ,a) " is not equal to " (tostring ,b)))))
+     (when (not passed?#) (error (.. (tostring ,a) " is not equal to " (tostring ,b)) 2))))
 
 (fn asserts.not= [a b]
   `(let [test# (require :test)
          passed?# (not (= ,a ,b))]
      (test#.handle-assertion passed?#)
-     (assert passed?# (.. (tostring ,a) " is equal to " (tostring ,b)))))
+     (when (not passed?#) (error (.. (tostring ,a) " is equal to " (tostring ,b)) 2))))
 
 (fn asserts.nil? [v]
   `(let [test# (require :test)
-         passed?# (= nil ,v)
-         error-msg# (.. (tostring ,v) " is not nil")]
+         passed?# (= nil ,v)]
      (test#.handle-assertion passed?#)
-     (assert passed?# error-msg#)))
+     (when (not passed?#) (error (.. (tostring ,v) " is not nil") 2))))
 
 (fn asserts.falsy [v ?message]
   `(let [test# (require :test)
          passed?# (not ,v)]
      (test#.handle-assertion passed?#)
-     (assert passed?# (or ,?message (.. (tostring ,v) " is not falsy")))))
+     (when (not passed?#) (error (or ,?message (.. (tostring ,v) " is not falsy")) 2))))
 
 (fn asserts.deep= [a b]
   `(let [test# (require :test)
          fnl# (require :fennel)
          passed?# ((. test# :deep-equal) ,a ,b)]
      (test#.handle-assertion passed?#)
-     (assert passed?# (.. "\n  " (fnl#.view ,a)
-                          "\n  is not deeply equal to\n  "
-                          (fnl#.view ,b)))))
+     (when (not passed?#) (error (.. (fnl#.view ,a)
+                                     "\n  is not deeply equal to\n  "
+                                     (fnl#.view ,b)) 2))))
 
 (fn asserts.match [pattern text]
   `(let [test# (require :test)
          passed?# (string.find ,text ,pattern)]
      (test#.handle-assertion passed?#)
-     (assert passed?# (.. "Pattern '" ,pattern "' not found in text: " (tostring ,text)))))
+     (when (not passed?#) (error (.. "Pattern '" ,pattern "' not found in text: " (tostring ,text)) 2))))
 
 (fn asserts.throws [test-fn ?pattern]
   `(let [test# (require :test)
@@ -55,12 +54,12 @@
      (if ok?#
          (do
            (test#.handle-assertion false)
-           (assert false "Expected function to throw an error, but it succeeded"))
+           (error "Expected function to throw an error, but it succeeded" 2))
          (if ,?pattern
-             (let [pattern-match?# (string.find err# ,?pattern)
-                   error-msg# (.. "Error message '" err# "' does not match pattern '" ,?pattern "'")]
+             (let [pattern-match?# (string.find err# ,?pattern)]
                (test#.handle-assertion pattern-match?#)
-               (assert pattern-match?# error-msg#))
+               (when (not pattern-match?#)
+                 (error (.. "Error message '" err# "' does not match pattern '" ,?pattern "'") 2)))
              (do
                (test#.handle-assertion true)
                true)))))

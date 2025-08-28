@@ -104,6 +104,38 @@
             (table.insert ungrouped-results result))))
     {: test-groups : ungrouped-results}))
 
+(fn simplify-error-message [error-message]
+  "Extract the relevant test file location from a stack trace"
+  (if (error-message:find "stack traceback:")
+      ;; Extract just the first relevant line from the stack trace
+      (let [lines (icollect [line (error-message:gmatch "[^\n]+")]
+                    line)]
+        ;; Find the first line that contains a test file path
+        (var simplified nil)
+        (each [_ line (ipairs lines)]
+          (when (and (not simplified) 
+                     (line:find "%.fnl:") 
+                     (not= line "")
+                     (not (line:find "/zip/"))  ;; Skip internal zip paths
+                     (not (line:find "in function 'error'")))
+            (set simplified line)))
+        ;; If we found a relevant line, use it; otherwise fall back to the original
+        (if simplified
+            (let [;; Extract the main error message (before "stack traceback:")
+                  main-msg (error-message:match "^(.-)stack traceback:")
+                  ;; Clean up the file line
+                  clean-line
+                  (-> simplified
+                      (: :gsub  "^%s*" "")
+                      (: :gsub  "%s*$" "")
+                      (: :gsub "^%s*[./]+" "")
+                      (: :gsub ": in function.*$" ""))
+                  ]
+              (.. clean-line "\n" (or main-msg "")))
+            error-message))
+      ;; No stack trace, return as-is
+      error-message))
+
 (fn calculate-median [durations]
   "Calculate median duration from a list of durations"
   (when (> (length durations) 0)
@@ -164,10 +196,11 @@
                             "")]
         (if result.ok
             (print (.. "[" green "PASS" reset "] " name timing-info))
-            (let [{: reason} result]
+            (let [{: reason} result
+                  simplified-reason (simplify-error-message reason)]
               (print (.. "[" red "FAIL" reset "] " name timing-info))
-              (print (.. "  " reason))
-              (table.insert failed-tests {: name : reason})))))
+              (print (.. "  " simplified-reason))
+              (table.insert failed-tests {: name :reason simplified-reason})))))
     failed-tests))
 
 
