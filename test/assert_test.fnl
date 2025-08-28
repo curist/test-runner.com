@@ -1,6 +1,6 @@
-(local assert-mod (require :assert))
+(local test (require :test))
 (import-macros asserts :asserts)
-(local {: testing} assert-mod)
+(local {: testing} test)
 
 (fn test-equal-operator []
   (asserts.= 1 1)
@@ -30,42 +30,42 @@
 (fn test-testing-function []
   ;; Test that testing function collects tests correctly
   ;; Since we now use parallel execution, we test the collection mechanism
-  (let [old-collected-tests assert-mod.state.collected-tests
-        _ (set assert-mod.state.collected-tests [])
+  (let [old-collected-tests test.state.collected-tests
+        _ (set test.state.collected-tests [])
         _ (testing "sample group" #(do (asserts.= 1 1) (asserts.ok true) (asserts.nil? nil)))
-        collected (icollect [_ test (ipairs assert-mod.state.collected-tests)] test)]
+        collected (icollect [_ test (ipairs test.state.collected-tests)] test)]
     ;; Verify the collection worked
     (asserts.= 1 (length collected))
     (asserts.= "sample group" (. collected 1 :description))
     ;; Execute the collected test and verify results
-    (let [results (assert-mod.execute-collected-tests)
+    (let [results (test.execute-collected-tests)
           result (. results 1)]
       (asserts.= "sample group" result.description)
       (asserts.= 3 result.passed)
       (asserts.= 0 result.failed)
       (asserts.= 3 result.total))
     ;; Restore state
-    (set assert-mod.state.collected-tests old-collected-tests)))
+    (set test.state.collected-tests old-collected-tests)))
 
 (fn test-testing-with-failures []
   ;; Test that assertion failures propagate correctly from testing blocks
   (asserts.throws #(asserts.= 1 2) "1 is not equal to 2"))
 
 (fn test-testing-nested-error []
-  ;; Test that nested assert-mod.testing calls throw an error
+  ;; Test that nested test.testing calls throw an error
   ;; Save current state
-  (let [old-collected assert-mod.state.collected-tests
-        old-current-group assert-mod.state.current-group
-        _ (set assert-mod.state.collected-tests [])
-        _ (set assert-mod.state.current-group nil)]
+  (let [old-collected test.state.collected-tests
+        old-current-group test.state.current-group
+        _ (set test.state.collected-tests [])
+        _ (set test.state.current-group nil)]
     ;; Collect the outer test
     (testing "outer" #(testing "inner" #(asserts.ok true)))
     ;; Execute and verify it fails with nested error
-    (asserts.throws assert-mod.execute-collected-tests "Nested asserts.testing calls are not supported")
-    (asserts.throws assert-mod.execute-collected-tests "Found 'inner' inside 'outer'")
+    (asserts.throws test.execute-collected-tests "Nested asserts.testing calls are not supported")
+    (asserts.throws test.execute-collected-tests "Found 'inner' inside 'outer'")
     ;; Restore state
-    (set assert-mod.state.collected-tests old-collected)
-    (set assert-mod.state.current-group old-current-group)))
+    (set test.state.collected-tests old-collected)
+    (set test.state.current-group old-current-group)))
 
 
 (fn test-match-operator []

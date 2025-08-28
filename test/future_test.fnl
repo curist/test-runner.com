@@ -1,8 +1,8 @@
-(local assert-mod (require :assert))
+(local test (require :test))
 (import-macros asserts :asserts)
 (local future (require :future))
 (local rb (require :redbean))
-(local {: testing} assert-mod)
+(local {: testing} test)
 
 (fn test-basic-future-operations []
   (testing "basic async execution and error handling"
