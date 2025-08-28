@@ -61,7 +61,7 @@
     ;; Collect the outer test
     (testing "outer" #(testing "inner" #(asserts.ok true)))
     ;; Execute and verify it fails with nested error
-    (asserts.throws test.execute-collected-tests "Nested asserts.testing calls are not supported")
+    (asserts.throws test.execute-collected-tests "Nested test.testing calls are not supported")
     (asserts.throws test.execute-collected-tests "Found 'inner' inside 'outer'")
     ;; Restore state
     (set test.state.collected-tests old-collected)
