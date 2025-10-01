@@ -311,19 +311,21 @@
                        (future.async #(run-test-file file options)))]
       ;; Process results for all files
       (each [i file (ipairs tests)]
-        (print)
-        (print file)
         (let [task (. test-tasks i)
               summary (task:await)]
-          ;; Collect overall test results
-          (each [_ result (ipairs summary.errors)]
-            (table.insert test-results result.ok))
-          ;; Organize and display results for this file
-          (let [organized (organize-test-results summary.errors)
-                failed-tests (display-test-results organized colors)]
-            ;; Accumulate all failed tests
-            (each [_ failure (ipairs failed-tests)]
-              (table.insert all-failed-tests failure)))))
+          ;; Only display file if it has tests that ran
+          (when (> (length summary.errors) 0)
+            (print)
+            (print file)
+            ;; Collect overall test results
+            (each [_ result (ipairs summary.errors)]
+              (table.insert test-results result.ok))
+            ;; Organize and display results for this file
+            (let [organized (organize-test-results summary.errors)
+                  failed-tests (display-test-results organized colors)]
+              ;; Accumulate all failed tests
+              (each [_ failure (ipairs failed-tests)]
+                (table.insert all-failed-tests failure))))))
       ;; Check if any tests were run
       (when (= (length test-results) 0)
         (print "No tests matched the provided filters.")
