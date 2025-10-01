@@ -226,8 +226,8 @@
         failed-tests []
         all-durations (collect-all-durations organized-results)
         median-duration (or (calculate-median all-durations) 0)
-        ;; Show timing for tests > 2x median OR > 5ms
-        threshold (math.max (* median-duration 2) 5)]
+        ;; Show timing for tests > 2x median and > 30ms
+        threshold (and (math.max (* median-duration 2) 30))]
     ;; Display grouped results with headers
     (each [test-name groups (pairs test-groups)]
       (print (.. "▼ " test-name))
