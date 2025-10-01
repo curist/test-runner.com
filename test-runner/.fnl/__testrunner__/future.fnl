@@ -187,7 +187,9 @@
           self.results)
       (do
         (let [poll-fds {}
-              fd-map {}]
+              fd-map {}
+              ;; Track start time for timeout calculation
+              (start-sec start-nsec) (when timeout-ms (rb.unix.clock_gettime))]
           ;; First, extract results from already-resolved futures
           (each [i f (ipairs self.futures)]
             (if (= f.status :resolved)
@@ -200,7 +202,16 @@
 
           ;; Poll only if there are pending futures
           (while (not (table-is-empty? poll-fds))
-            (let [timeout (if timeout-ms (math.floor timeout-ms) -1)
+            ;; Calculate remaining timeout
+            (let [timeout (if timeout-ms
+                              (let [(now-sec now-nsec) (rb.unix.clock_gettime)
+                                    elapsed-ms (+ (* (- now-sec start-sec) 1000)
+                                                  (/ (- now-nsec start-nsec) 1000000))
+                                    remaining-ms (- timeout-ms elapsed-ms)]
+                                (if (<= remaining-ms 0)
+                                    0  ; Already expired
+                                    (math.floor remaining-ms)))
+                              -1)  ; No timeout
                   ready-fds (assert (rb.unix.poll poll-fds timeout))]
               (when (table-is-empty? ready-fds)
                 (error "timeout"))

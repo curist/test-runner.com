@@ -106,6 +106,26 @@
          (asserts.ok (not ok))
          (asserts.ok (err:find "timeout")))
 
+       ;; Test future.all timeout is NOT cumulative
+       ;; With 3 futures completing at staggered intervals,
+       ;; timeout budget should apply to total wait time, not per poll
+       (let [(sec1 nsec1) (rb.unix.clock_gettime)
+             f1 (future.sleep 30)
+             f2 (future.sleep 60)
+             f3 (future.sleep 90)
+             all-f (future.all [f1 f2 f3])
+             ;; With cumulative timeout: could take 3×80ms = 240ms
+             ;; With proper timeout: should respect 150ms total budget
+             (ok err) (pcall #(all-f:await 150))
+             (sec2 nsec2) (rb.unix.clock_gettime)
+             t1 (+ sec1 (/ nsec1 1e9))
+             t2 (+ sec2 (/ nsec2 1e9))
+             duration (- t2 t1)]
+         ;; Should succeed since all futures complete within 150ms
+         (asserts.ok ok (.. "should complete within timeout, error: " (tostring err)))
+         ;; But importantly, total time should be ~90ms (longest future), not 240ms
+         (asserts.ok (< duration 0.15) (.. "timeout should not be cumulative, duration was " duration)))
+
        ;; Test future.all cancellation
        (let [f1 (future.sleep 200)  ; Long-running task
              f2 (future.sleep 300)  ; Even longer-running task  
