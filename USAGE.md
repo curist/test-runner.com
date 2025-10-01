@@ -64,7 +64,7 @@ Assertions:
   (asserts.not= a b)               Passes if a != b
   (asserts.nil? v)                 Passes if v is nil
   (asserts.deep= a b)              Deep table equality check
-  (asserts.match pattern text)     Passes if text contains pattern (Lua patterns)
+  (asserts.match text pattern)     Passes if text contains pattern (Lua patterns)
   (asserts.includes text substr)   Passes if text includes substr (plain text, no escaping)
   (asserts.throws fn ?pattern)     Passes if fn throws an error, optionally matching pattern
 

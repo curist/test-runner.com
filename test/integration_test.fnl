@@ -31,7 +31,7 @@
    "Test that invalid flags show proper error message"
    (let [result (run-cli "--invalid")]
      (asserts.falsy result.success "Invalid flag should fail")
-     (asserts.match "unknown option" result.output)))
+     (asserts.match result.output "unknown option")))
 
  :test-successful-test-execution
  (fn []
@@ -64,9 +64,9 @@
    ;; Without --, a dash-prefixed arg should be rejected as unknown flag
    (let [result-no-sentinel (run-cli "-fake-arg")]
      (asserts.falsy result-no-sentinel.success "Dash arg without -- should fail")
-     (asserts.match "unknown option" result-no-sentinel.output))
+     (asserts.match result-no-sentinel.output "unknown option"))
 
    ;; With --, the same arg should be treated as a path (will fail with file not found)
    (let [result-with-sentinel (run-cli "-- -fake-arg")]
      (asserts.falsy result-with-sentinel.success "Non-existent path should fail")
-     (asserts.match "invalid filepath" result-with-sentinel.output)))}
+     (asserts.match result-with-sentinel.output "invalid filepath")))}

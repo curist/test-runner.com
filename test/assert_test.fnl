@@ -70,16 +70,16 @@
 
 (fn test-match-operator []
   "Test asserts.match function with various patterns"
-  (asserts.match "hello" "hello world")
-  (asserts.match "wor" "hello world")
-  (asserts.match "%d+" "test 123 string")
-  (asserts.match "^start" "start of line")
-  (asserts.match "end$" "line end"))
+  (asserts.match "hello world" "hello")
+  (asserts.match "hello world" "wor")
+  (asserts.match "test 123 string" "%d+")
+  (asserts.match "start of line" "^start")
+  (asserts.match "line end" "end$"))
 
 (fn test-match-operator-failure []
   "Test that asserts.match fails appropriately"
   (asserts.throws
-    #(asserts.match "not found" "hello world")
+    #(asserts.match "hello world" "not found")
     "Pattern 'not found' not found in text: hello world"))
 
 (fn test-throws-operator []

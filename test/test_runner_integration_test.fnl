@@ -10,7 +10,7 @@
      (asserts.ok (> (length files) 0) "Should find test files")
      ;; Check that all found files end with _test.fnl
      (each [_ file (ipairs files)]
-       (asserts.match "_test%.fnl$" file "All files should be test files"))))
+       (asserts.match file "_test%.fnl$" "All files should be test files"))))
 
  :test-walk-skips-git-directories
  (fn []
@@ -39,7 +39,7 @@
      (asserts.ok (> (length files) 0) "Should find test files in test directory")
      ;; All files should be from test directory
      (each [_ file (ipairs files)]
-       (asserts.match "^test/" file "All files should be from test directory"))))
+       (asserts.match file "^test/" "All files should be from test directory"))))
 
  :test-collect-test-files-with-specific-file
  (fn []

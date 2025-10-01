@@ -42,7 +42,7 @@
                                      "\n  is not deeply equal to\n  "
                                      (fnl#.view ,b)) 2))))
 
-(fn asserts.match [pattern text]
+(fn asserts.match [text pattern]
   `(let [test# (require :test)
          passed?# (string.find ,text ,pattern)]
      (test#.handle-assertion passed?#)
