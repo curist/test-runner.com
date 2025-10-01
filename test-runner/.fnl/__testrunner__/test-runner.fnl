@@ -64,16 +64,19 @@
           (set results.total (+ results.total 1))
           (let [(ok res) (pcall #(task:await))
                 name (name:gsub "^test%-" "")]
-            (let [test-groups (if (and ok (= (type res) :table) res.groups) 
-                                  res.groups 
+            (let [test-groups (if (and ok (= (type res) :table) res.groups)
+                                  res.groups
                                   [])
                   duration (if (and ok (= (type res) :table) res.duration)
                                res.duration
-                               0)]
+                               0)
+                  ;; Check if any group has failures
+                  has-group-failures (accumulate [has-fail false _ group (ipairs test-groups)]
+                                       (or has-fail (> group.failed 0)))]
               ;; Record timing information
               (table.insert results.timings
                 {:name name :duration duration :file file})
-              (if ok
+              (if (and ok (not has-group-failures))
                   (do
                     (set results.passed (+ results.passed 1))
                     (table.insert results.errors
@@ -82,7 +85,8 @@
                   (do
                     (set results.failed (+ results.failed 1))
                     (table.insert results.errors
-                      {:ok false :name name :reason res
+                      {:ok false :name name
+                       :reason (if (not ok) res "Test group(s) had assertion failures")
                        :groups test-groups :duration duration}))))))))
     results))
 
@@ -175,6 +179,7 @@
     ;; Display grouped results with headers
     (each [test-name groups (pairs test-groups)]
       (print (.. "▼ " test-name))
+      (var test-has-failures false)
       (each [_ group (ipairs groups)]
         (let [group-status (if (> group.failed 0) "FAIL" "PASS")
               group-color (if (> group.failed 0) red green)
@@ -183,9 +188,15 @@
               timing-info (if (> duration threshold)
                               (.. " " yellow (format-duration duration) reset)
                               "")]
-          (print (.. indent "[" group-color group-status reset "] " 
-                     group.description 
-                     " (" group.passed "/" group.total ")" timing-info)))))
+          (when (> group.failed 0)
+            (set test-has-failures true))
+          (print (.. indent "[" group-color group-status reset "] "
+                     group.description
+                     " (" group.passed "/" group.total ")" timing-info))))
+      ;; Add test to failed-tests if any group failed
+      (when test-has-failures
+        (table.insert failed-tests {:name test-name
+                                    :reason "One or more test groups failed"})))
 
     ;; Display ungrouped results  
     (each [_ result (ipairs ungrouped-results)]
