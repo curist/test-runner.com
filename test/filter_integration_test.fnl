@@ -16,9 +16,9 @@
     (testing "match filter output"
       #(do
          (asserts.ok result.success "Command should succeed")
-         (asserts.match "Running tests with filters: %-%-match=filter" result.output)
-         (asserts.match "should%-run%-test%-combined%-filters" result.output)
-         (asserts.match "should%-run%-test%-no%-filters" result.output)
+         (asserts.includes result.output "Running tests with filters: --match=filter")
+         (asserts.includes result.output "should-run-test-combined-filters")
+         (asserts.includes result.output "should-run-test-no-filters")
          ;; Should NOT include tests without "filter" in name
          (asserts.falsy (result.output:match "should%-run%-test%-case%-insensitive"))))))
 
@@ -28,11 +28,11 @@
     (testing "no-match filter output"
       #(do
          (asserts.ok result.success "Command should succeed")
-         (asserts.match "Running tests with filters: %-%-no%-match=filter" result.output)
+         (asserts.includes result.output "Running tests with filters: --no-match=filter")
          ;; Should include tests without "filter" in name
-         (asserts.match "should%-run%-test%-case%-insensitive" result.output)
+         (asserts.includes result.output "should-run-test-case-insensitive")
          ;; Should NOT include tests with "filter" in name
-         (asserts.falsy (result.output:match "should%-run%-test%-combined%-filters"))))))
+         (asserts.falsy (result.output:match "should-run-test-combined-filters"))))))
 
 (fn test-combined-filters []
   "Test that --match and --no-match work together"
@@ -40,12 +40,12 @@
     (testing "combined filters output"
       #(do
          (asserts.ok result.success "Command should succeed")
-         (asserts.match "%-%-match=include" result.output)
-         (asserts.match "%-%-no%-match=multiple" result.output)
+         (asserts.includes result.output "--match=include")
+         (asserts.includes result.output "--no-match=multiple")
          ;; Should only include "include" tests without "multiple"
-         (asserts.match "should%-run%-test%-include%-only" result.output)
+         (asserts.includes result.output "should-run-test-include-only")
          ;; Should NOT include tests with "multiple"
-         (asserts.falsy (result.output:match "should%-run%-test%-multiple%-includes"))))))
+         (asserts.falsy (result.output:match "should-run-test-multiple-includes"))))))
 
 (fn test-case-insensitive-matching []
   "Test that filters are case-insensitive"
@@ -53,8 +53,8 @@
     (testing "case-insensitive matching"
       #(do
          (asserts.ok result.success "Command should succeed")
-         (asserts.match "%-%-match=CASE" result.output)
-         (asserts.match "should%-run%-test%-case%-insensitive" result.output)))))
+         (asserts.includes result.output "--match=CASE")
+         (asserts.includes result.output "should-run-test-case-insensitive")))))
 
 (fn test-no-matching-tests []
   "Test that no matches produces appropriate output"
@@ -62,7 +62,7 @@
     (testing "no matches output"
       #(do
          (asserts.ok result.success "Command should succeed with exit 0")
-         (asserts.match "No tests matched the provided filters" result.output)))))
+         (asserts.includes result.output "No tests matched the provided filters")))))
 
 (fn test-empty-filter-validation []
   "Test that empty filters are rejected"
@@ -70,7 +70,7 @@
     (testing "empty filter validation"
       #(do
          (asserts.falsy result.success "Command should fail")
-         (asserts.match "filter cannot be empty" result.output)))))
+         (asserts.includes result.output "filter cannot be empty")))))
 
 (fn test-multiple-match-flags []
   "Test that multiple --match flags work (OR logic)"
@@ -78,11 +78,11 @@
     (testing "multiple match flags"
       #(do
          (asserts.ok result.success "Command should succeed")
-         (asserts.match "%-%-match=include" result.output)
-         (asserts.match "%-%-match=exclude" result.output)
+         (asserts.includes result.output "--match=include")
+         (asserts.includes result.output "--match=exclude")
          ;; Should include tests matching either filter
-         (asserts.match "should%-run%-test%-include%-only" result.output)
-         (asserts.match "should%-run%-test%-exclude%-only" result.output)))))
+         (asserts.includes result.output "should-run-test-include-only")
+         (asserts.includes result.output "should-run-test-exclude-only")))))
 
 (fn test-short-flag-aliases []
   "Test that short flags -m and -M work"
@@ -90,8 +90,8 @@
     (testing "short flag aliases"
       #(do
          (asserts.ok result.success "Command should succeed")
-         (asserts.match "%-%-match=case" result.output)
-         (asserts.match "should%-run%-test%-case%-insensitive" result.output)))))
+         (asserts.includes result.output "--match=case")
+         (asserts.includes result.output "should-run-test-case-insensitive")))))
 
 {: test-match-filter-includes-matching-tests
  : test-no-match-filter-excludes-matching-tests

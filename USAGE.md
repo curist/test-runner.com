@@ -58,14 +58,15 @@ Test files must be named `*_test.fnl` and export a table with `test-*` functions
 
 Assertions:
 
-  (asserts.ok v ?msg)           Passes if v is truthy
-  (asserts.falsy v ?msg)        Passes if v is nil or false
-  (asserts.= a b)               Passes if a == b
-  (asserts.not= a b)            Passes if a != b
-  (asserts.nil? v)              Passes if v is nil
-  (asserts.deep= a b)           Deep table equality check
-  (asserts.match pattern text)  Passes if text contains pattern (Lua patterns)
-  (asserts.throws fn ?pattern)  Passes if fn throws an error, optionally matching pattern
+  (asserts.ok v ?msg)              Passes if v is truthy
+  (asserts.falsy v ?msg)           Passes if v is nil or false
+  (asserts.= a b)                  Passes if a == b
+  (asserts.not= a b)               Passes if a != b
+  (asserts.nil? v)                 Passes if v is nil
+  (asserts.deep= a b)              Deep table equality check
+  (asserts.match pattern text)     Passes if text contains pattern (Lua patterns)
+  (asserts.includes text substr)   Passes if text includes substr (plain text, no escaping)
+  (asserts.throws fn ?pattern)     Passes if fn throws an error, optionally matching pattern
 
 Use `testing` for organized test groups:
 

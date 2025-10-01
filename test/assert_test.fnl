@@ -93,6 +93,31 @@
   (asserts.throws #(asserts.= 1 2) "1 is not equal to 2")
   (asserts.throws #(asserts.nil? "not nil") "not nil"))
 
+(fn test-includes-operator []
+  "Test basic substring inclusion"
+  (asserts.includes "hello world" "world")
+  (asserts.includes "test-runner.com --match=filter" "--match=filter")
+  (asserts.includes "Running tests" "Running"))
+
+(fn test-includes-special-characters []
+  "Test that special characters don't need escaping"
+  (asserts.includes "Running tests with filters: --match=filter" "--match=filter")
+  (asserts.includes "test-runner.com" ".")
+  (asserts.includes "foo-bar-baz" "-"))
+
+(fn test-includes-case-sensitive []
+  "Test that includes is case-sensitive"
+  (asserts.includes "Hello World" "Hello")
+  (asserts.includes "Hello World" "World")
+  ;; This should fail if uncommented:
+  ;; (asserts.includes "Hello World" "hello")
+  )
+
+(fn test-includes-failure []
+  "Test that includes properly fails when substring not found"
+  (let [(ok err) (pcall #(asserts.includes "hello world" "foo"))]
+    (asserts.falsy ok "Should fail when substring not found")
+    (asserts.includes err "Substring 'foo' not found")))
 
 {: test-equal-operator
  : test-not-equal-operator
@@ -107,4 +132,8 @@
  : test-match-operator-failure
  : test-throws-operator
  : test-throws-operator-with-pattern
+ : test-includes-operator
+ : test-includes-special-characters
+ : test-includes-case-sensitive
+ : test-includes-failure
  }

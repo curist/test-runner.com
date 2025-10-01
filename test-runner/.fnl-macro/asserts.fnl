@@ -48,6 +48,12 @@
      (test#.handle-assertion passed?#)
      (when (not passed?#) (error (.. "Pattern '" ,pattern "' not found in text: " (tostring ,text)) 2))))
 
+(fn asserts.includes [text substring]
+  `(let [test# (require :test)
+         passed?# (not= nil (string.find ,text ,substring 1 true))]
+     (test#.handle-assertion passed?#)
+     (when (not passed?#) (error (.. "Substring '" ,substring "' not found in text: " (tostring ,text)) 2))))
+
 (fn asserts.throws [test-fn ?pattern]
   `(let [test# (require :test)
          (ok?# err#) (pcall ,test-fn)]
