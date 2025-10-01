@@ -14,18 +14,36 @@ OVERVIEW
 
 FLAGS
 
-  -h or --help     display this text
-  -v or --version  show version and build information
+  -h or --help              display this text
+  -v or --version           show version and build information
+  -m or --match <text>      run only tests whose names contain <text>
+  -M or --no-match <text>   skip tests whose names contain <text>
+
+Filtering:
+
+  Filters match against test names after stripping the 'test-' prefix.
+  Multiple --match flags are OR'd (test runs if name contains ANY match term).
+  Multiple --no-match flags are OR'd (test skipped if name contains ANY exclude term).
+  Combined: requires inclusion (if --match provided) AND no exclusions.
+  Matching is case-insensitive literal substring search (not regex/patterns).
 
 When not given a path, discovers and runs all `*_test.fnl` files in the current directory.
 When given paths, runs tests only for the specified files or directories.
 
 Examples:
 
-  test-runner.com                           # Run all tests
-  test-runner.com test/my_test.fnl          # Run specific test file  
-  test-runner.com test/                     # Run all tests in directory
-  test-runner.com test/unit/ test/app_test.fnl  # Run multiple paths
+  test-runner.com                                      # Run all tests
+  test-runner.com test/my_test.fnl                     # Run specific test file
+  test-runner.com test/                                # Run all tests in directory
+  test-runner.com test/unit/ test/app_test.fnl         # Run multiple paths
+
+  # Filter tests by name
+  test-runner.com --match auth                         # Run only auth-related tests
+  test-runner.com -m auth -m database                  # Run auth OR database tests
+  test-runner.com --no-match slow                      # Skip slow tests
+  test-runner.com -M slow -M integration               # Skip slow OR integration tests
+  test-runner.com --match auth --no-match slow         # Run auth tests except slow ones
+  test-runner.com -m auth test/integration_test.fnl    # Filter within specific file
 
 Test files must be named `*_test.fnl` and export a table with `test-*` functions:
 

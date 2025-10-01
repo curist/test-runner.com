@@ -2,6 +2,27 @@
 (local future (require :__testrunner__.future))
 (local test (require :test))
 
+(fn should-run-test? [test-name includes excludes]
+  "Determine if a test should run based on include/exclude filters.
+   Strips 'test-' prefix and performs case-insensitive literal substring matching."
+  (let [;; Strip test- prefix and lowercase for matching
+        name-without-prefix (test-name:gsub "^test%-" "")
+        name-lower (name-without-prefix:lower)]
+    ;; Check exclusions first (any exclude match means skip)
+    (var should-skip false)
+    (each [_ exclude (ipairs excludes)]
+      (when (name-lower:find (exclude:lower) 1 true)
+        (set should-skip true)))
+
+    (if should-skip
+        false
+        ;; If includes are specified, name must match at least one
+        (if (> (length includes) 0)
+            (accumulate [matches false _ inc (ipairs includes)]
+              (or matches (not= nil (name-lower:find (inc:lower) 1 true))))
+            ;; No includes specified, test runs by default
+            true))))
+
 (fn get-time-ms []
   "Get current time in milliseconds using high-resolution monotonic clock"
   (let [(seconds nanoseconds) (rb.unix.clock_gettime rb.unix.CLOCK_MONOTONIC)]
@@ -39,9 +60,12 @@
                   (table.insert tests path)))))))
     tests))
 
-(fn run-test-file [file]
-  "Runs tests for a single file and returns a summary table."
+(fn run-test-file [file options]
+  "Runs tests for a single file and returns a summary table.
+   options: table with :matches and :excludes arrays for filtering"
   (let [results {:passed 0 :failed 0 :total 0 :errors [] :groups [] :timings []}
+        includes (or options.matches [])
+        excludes (or options.excludes [])
         ;; Try to load the test file with better error handling
         (load-ok suite) (xpcall #(require (file:gsub "%.fnl$" ""))
                                 (fn [err]
@@ -63,55 +87,59 @@
                 (when (and test-fn (test-name:match "^test-"))
                   (table.insert test-names test-name))))
             (table.sort test-names)
-            (let [test-tasks
-                  (collect [_ name (ipairs test-names)]
-                    (values
-                      name
-                      (future.async
-                        #(let [start-time (get-time-ms)
-                               test-to-run (. suite name)]
-                           ;; Reset state and clear any previous collected tests
-                           (set test.state.groups [])
-                           (set test.state.collected-tests [])
-                           ;; Set current file for error reporting
-                           (set test.state.current-file file)
-                           ;; Run test function to collect testing blocks
-                           (test-to-run)
-                           ;; Execute collected tests in parallel and get results
-                           (let [parallel-results (test.execute-collected-tests)
-                                 end-time (get-time-ms)
-                                 duration (- end-time start-time)]
-                             {:groups parallel-results :duration duration})))))]
-              ;; Iterate in sorted order for deterministic execution
-              (each [_ name (ipairs test-names)]
-                (let [task (. test-tasks name)]
-                  (set results.total (+ results.total 1))
-                  (let [(ok res) (pcall #(task:await))
-                        name (name:gsub "^test%-" "")]
-                    (let [test-groups (if (and ok (= (type res) :table) res.groups)
-                                          res.groups
-                                          [])
-                          duration (if (and ok (= (type res) :table) res.duration)
-                                       res.duration
-                                       0)
-                          ;; Check if any group has failures
-                          has-group-failures (accumulate [has-fail false _ group (ipairs test-groups)]
-                                               (or has-fail (> group.failed 0)))]
-                      ;; Record timing information
-                      (table.insert results.timings
-                        {:name name :duration duration :file file})
-                      (if (and ok (not has-group-failures))
-                          (do
-                            (set results.passed (+ results.passed 1))
-                            (table.insert results.errors
-                              {:ok true :name name
-                               :groups test-groups :duration duration}))
-                          (do
-                            (set results.failed (+ results.failed 1))
-                            (table.insert results.errors
-                              {:ok false :name name
-                               :reason (if (not ok) res "Test group(s) had assertion failures")
-                               :groups test-groups :duration duration})))))))))))
+            ;; Filter test names based on includes/excludes
+            (let [filtered-names (icollect [_ name (ipairs test-names)]
+                                   (if (should-run-test? name includes excludes)
+                                       name))]
+              (let [test-tasks
+                    (collect [_ name (ipairs filtered-names)]
+                      (values
+                        name
+                        (future.async
+                          #(let [start-time (get-time-ms)
+                                 test-to-run (. suite name)]
+                             ;; Reset state and clear any previous collected tests
+                             (set test.state.groups [])
+                             (set test.state.collected-tests [])
+                             ;; Set current file for error reporting
+                             (set test.state.current-file file)
+                             ;; Run test function to collect testing blocks
+                             (test-to-run)
+                             ;; Execute collected tests in parallel and get results
+                             (let [parallel-results (test.execute-collected-tests)
+                                   end-time (get-time-ms)
+                                   duration (- end-time start-time)]
+                               {:groups parallel-results :duration duration})))))]
+                ;; Iterate in sorted order for deterministic execution
+                (each [_ name (ipairs filtered-names)]
+                  (let [task (. test-tasks name)]
+                    (set results.total (+ results.total 1))
+                    (let [(ok res) (pcall #(task:await))
+                          name (name:gsub "^test%-" "")]
+                      (let [test-groups (if (and ok (= (type res) :table) res.groups)
+                                            res.groups
+                                            [])
+                            duration (if (and ok (= (type res) :table) res.duration)
+                                         res.duration
+                                         0)
+                            ;; Check if any group has failures
+                            has-group-failures (accumulate [has-fail false _ group (ipairs test-groups)]
+                                                 (or has-fail (> group.failed 0)))]
+                        ;; Record timing information
+                        (table.insert results.timings
+                          {:name name :duration duration :file file})
+                        (if (and ok (not has-group-failures))
+                            (do
+                              (set results.passed (+ results.passed 1))
+                              (table.insert results.errors
+                                {:ok true :name name
+                                 :groups test-groups :duration duration}))
+                            (do
+                              (set results.failed (+ results.failed 1))
+                              (table.insert results.errors
+                                {:ok false :name name
+                                 :reason (if (not ok) res "Test group(s) had assertion failures")
+                                 :groups test-groups :duration duration}))))))))))))
     results))
 
 (fn organize-test-results [summary-errors]
@@ -258,36 +286,53 @@
         (print (.. "- " failure.name ": " failure.reason)))
       (os.exit 1))))
 
-(fn run-tests [tests]
+(fn run-tests [tests options]
+  "Run tests with optional filtering.
+   options: table with :matches and :excludes arrays"
   (test.reset)
   (let [start-time (get-time-ms)
         test-results []
         all-failed-tests []
         colors {:green "\27[1;32m" :red "\27[1;31m" :reset "\27[0m"
                 :gray "\27[90m" :yellow "\27[0;33m"}
-        ;; Run all test files in parallel
-        test-tasks (icollect [_ file (ipairs tests)]
-                     (future.async #(run-test-file file)))]
-    ;; Process results for all files
-    (each [i file (ipairs tests)]
-      (print)
-      (print file)
-      (let [task (. test-tasks i)
-            summary (task:await)]
-        ;; Collect overall test results
-        (each [_ result (ipairs summary.errors)]
-          (table.insert test-results result.ok))
-        ;; Organize and display results for this file
-        (let [organized (organize-test-results summary.errors)
-              failed-tests (display-test-results organized colors)]
-          ;; Accumulate all failed tests
-          (each [_ failure (ipairs failed-tests)]
-            (table.insert all-failed-tests failure)))))
-    ;; Calculate total duration
-    (let [end-time (get-time-ms)
-          total-duration (- end-time start-time)]
-      ;; Display final summary
-      (display-summary test-results all-failed-tests colors total-duration))))
+        includes (or options.matches [])
+        excludes (or options.excludes [])]
+    ;; Display filter info if filters are active
+    (when (or (> (length includes) 0) (> (length excludes) 0))
+      (let [filter-parts []]
+        (each [_ term (ipairs includes)]
+          (table.insert filter-parts (.. "--match=" term)))
+        (each [_ term (ipairs excludes)]
+          (table.insert filter-parts (.. "--no-match=" term)))
+        (print (.. "Running tests with filters: " (table.concat filter-parts " ")))
+        (print)))
+    ;; Run all test files in parallel
+    (let [test-tasks (icollect [_ file (ipairs tests)]
+                       (future.async #(run-test-file file options)))]
+      ;; Process results for all files
+      (each [i file (ipairs tests)]
+        (print)
+        (print file)
+        (let [task (. test-tasks i)
+              summary (task:await)]
+          ;; Collect overall test results
+          (each [_ result (ipairs summary.errors)]
+            (table.insert test-results result.ok))
+          ;; Organize and display results for this file
+          (let [organized (organize-test-results summary.errors)
+                failed-tests (display-test-results organized colors)]
+            ;; Accumulate all failed tests
+            (each [_ failure (ipairs failed-tests)]
+              (table.insert all-failed-tests failure)))))
+      ;; Check if any tests were run
+      (when (= (length test-results) 0)
+        (print "No tests matched the provided filters.")
+        (os.exit 0))
+      ;; Calculate total duration
+      (let [end-time (get-time-ms)
+            total-duration (- end-time start-time)]
+        ;; Display final summary
+        (display-summary test-results all-failed-tests colors total-duration)))))
 
 (fn collect-test-files [args]
   (var tests [])
@@ -314,4 +359,5 @@
  : run-tests
  : collect-test-files
  : get-time-ms
- : format-duration}
+ : format-duration
+ : should-run-test?}

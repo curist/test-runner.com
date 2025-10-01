@@ -22,32 +22,66 @@
   (os.exit 0))
 
 (fn parse-flags [args]
-  "Parse command line flags and return filtered arguments"
-  (let [filtered-args []]
+  "Parse command line flags and return options table with paths, matches, and excludes"
+  (let [options {:paths [] :matches [] :excludes []}]
     (var parsing-flags true)
-    (each [_ arg (ipairs args)]
-      (if (not parsing-flags)
-          ;; After --, treat everything as positional argument
-          (table.insert filtered-args arg)
-          (= arg "--")
-          ;; Stop parsing flags after --
-          (set parsing-flags false)
-          (or (= arg "--help") (= arg "-h"))
-          (show-help)
-          (or (= arg "--version") (= arg "-v"))
-          (show-version)
-          ;; Check for unknown flags
-          (arg:match "^%-")
-          (do
-            (print (.. "test-runner.com: unknown option '" arg "'"))
-            (print "Try 'test-runner.com --help' for more information.")
-            (os.exit 1))
-          ;; Not a flag, keep it
-          (table.insert filtered-args arg)))
-    filtered-args))
+    (var i 1)
+    (while (<= i (length args))
+      (let [arg (. args i)]
+        (if (not parsing-flags)
+            ;; After --, treat everything as positional argument
+            (table.insert options.paths arg)
+            (= arg "--")
+            ;; Stop parsing flags after --
+            (set parsing-flags false)
+            (or (= arg "--help") (= arg "-h"))
+            (show-help)
+            (or (= arg "--version") (= arg "-v"))
+            (show-version)
+            ;; Handle --match / -m flag
+            (or (= arg "--match") (= arg "-m"))
+            (do
+              (set i (+ i 1))
+              (let [value (. args i)]
+                (if (not value)
+                    (do
+                      (print (.. "test-runner.com: option '" arg "' requires a value"))
+                      (print "Try 'test-runner.com --help' for more information.")
+                      (os.exit 1))
+                    (= value "")
+                    (do
+                      (print "test-runner.com: filter cannot be empty")
+                      (print "Try 'test-runner.com --help' for more information.")
+                      (os.exit 1))
+                    (table.insert options.matches value))))
+            ;; Handle --no-match / -M flag
+            (or (= arg "--no-match") (= arg "-M"))
+            (do
+              (set i (+ i 1))
+              (let [value (. args i)]
+                (if (not value)
+                    (do
+                      (print (.. "test-runner.com: option '" arg "' requires a value"))
+                      (print "Try 'test-runner.com --help' for more information.")
+                      (os.exit 1))
+                    (= value "")
+                    (do
+                      (print "test-runner.com: filter cannot be empty")
+                      (print "Try 'test-runner.com --help' for more information.")
+                      (os.exit 1))
+                    (table.insert options.excludes value))))
+            ;; Check for unknown flags
+            (arg:match "^%-")
+            (do
+              (print (.. "test-runner.com: unknown option '" arg "'"))
+              (print "Try 'test-runner.com --help' for more information.")
+              (os.exit 1))
+            ;; Not a flag, keep it
+            (table.insert options.paths arg)))
+      (set i (+ i 1)))
+    options))
 
 ;; Main execution with enhanced error handling
-(-> _G.arg
-    parse-flags
-    test-runner.collect-test-files
-    test-runner.run-tests)
+(let [options (parse-flags _G.arg)
+      tests (test-runner.collect-test-files options.paths)]
+  (test-runner.run-tests tests options))
