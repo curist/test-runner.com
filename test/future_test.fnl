@@ -297,16 +297,25 @@
              result (future.__internal__.read-all read-fd)]
          (rb.unix.close read-fd)
          (asserts.= "" result))
-       
+
        ;; Test read-all with multiple writes
        (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
              _ (rb.unix.write write-fd "part1")
-             _ (rb.unix.write write-fd "part2") 
+             _ (rb.unix.write write-fd "part2")
              _ (rb.unix.write write-fd "part3")
              _ (rb.unix.close write-fd)  ; Signal EOF
              result (future.__internal__.read-all read-fd)]
          (rb.unix.close read-fd)
-         (asserts.= "part1part2part3" result))))
+         (asserts.= "part1part2part3" result))
+
+       ;; Test read-all with actual read error (closed fd)
+       ;; This should surface the error rather than silently returning partial data
+       (let [(read-fd write-fd) (_G.assert (rb.unix.pipe))
+             _ (rb.unix.close read-fd)  ; Close read end
+             _ (rb.unix.close write-fd)]
+         ;; Reading from closed fd should error, not return ""
+         (let [(ok result) (pcall future.__internal__.read-all read-fd)]
+           (asserts.ok (not ok) "read-all should error on closed fd, not return partial data")))))
   
   (testing "write-all and read-all integration with JSON"
     ;; Test round-trip with complex JSON data

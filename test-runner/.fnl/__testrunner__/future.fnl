@@ -51,14 +51,25 @@
 
 (fn read-all [fd]
   "Read all data from file descriptor until EOF.
-   Accumulates chunks until unix.read returns empty string (EOF)."
+   Accumulates chunks until unix.read returns empty string (EOF).
+   Retries on EINTR/EAGAIN, surfaces genuine read errors."
   (var complete-data "")
   (var done false)
   (while (not done)
-    (let [(ok chunk) (pcall rb.unix.read fd)]
-      (if (and ok chunk (not= chunk ""))
-          (set complete-data (.. complete-data chunk))
-          (set done true))))
+    (let [(chunk err) (rb.unix.read fd)]
+      (if chunk
+          ;; Successfully read data
+          (if (= chunk "")
+              ;; EOF reached
+              (set done true)
+              ;; Got data, accumulate it
+              (set complete-data (.. complete-data chunk)))
+          ;; Read failed, check if it's a recoverable error
+          (if (or (= err rb.unix.EINTR) (= err rb.unix.EAGAIN))
+              ;; Recoverable error, retry
+              nil  ; Continue loop
+              ;; Genuine error, propagate it
+              (error (.. "read failed: " (tostring err)))))))
   complete-data)
 
 
