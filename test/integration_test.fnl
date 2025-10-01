@@ -2,7 +2,7 @@
 
 (fn run-cli [args]
   "Run the test-runner CLI with given args and return {output, success, exit-code}"
-  (let [cmd (.. "./artifacts/test-runner.com " args)
+  (let [cmd (.. "./artifacts/test-runner.com " args " 2>&1")
         proc (io.popen cmd "r")
         output (proc:read "*a")
         success (proc:close)]
@@ -56,4 +56,17 @@
        (os.remove temp-file)
 
        ;; Assert the test failed as expected
-       (asserts.falsy result.success "Failing test should exit with non-zero code"))))}
+       (asserts.falsy result.success "Failing test should exit with non-zero code"))))
+
+ :test-double-dash-sentinel
+ (fn []
+   "Test that -- allows arguments starting with dashes"
+   ;; Without --, a dash-prefixed arg should be rejected as unknown flag
+   (let [result-no-sentinel (run-cli "-fake-arg")]
+     (asserts.falsy result-no-sentinel.success "Dash arg without -- should fail")
+     (asserts.match "unknown option" result-no-sentinel.output))
+
+   ;; With --, the same arg should be treated as a path (will fail with file not found)
+   (let [result-with-sentinel (run-cli "-- -fake-arg")]
+     (asserts.falsy result-with-sentinel.success "Non-existent path should fail")
+     (asserts.match "invalid filepath" result-with-sentinel.output)))}

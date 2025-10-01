@@ -24,8 +24,15 @@
 (fn parse-flags [args]
   "Parse command line flags and return filtered arguments"
   (let [filtered-args []]
+    (var parsing-flags true)
     (each [_ arg (ipairs args)]
-      (if (or (= arg "--help") (= arg "-h"))
+      (if (not parsing-flags)
+          ;; After --, treat everything as positional argument
+          (table.insert filtered-args arg)
+          (= arg "--")
+          ;; Stop parsing flags after --
+          (set parsing-flags false)
+          (or (= arg "--help") (= arg "-h"))
           (show-help)
           (or (= arg "--version") (= arg "-v"))
           (show-version)
