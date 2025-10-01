@@ -21,73 +21,97 @@
                    (dir:match "%.jj$")
                    (dir:match "node_modules")
                    (dir:match "artifacts")))
-      (each [name kind (rb.unix.opendir dir)]
-        (let [path (.. dir "/" name)]
-          (if (and (= kind 4)
-                   (not (= name "."))
-                   (not (= name "..")))
-              ;; Recursively walk subdirectories
-              (each [_ file (ipairs (walk path))]
-                (table.insert tests file))
-              ;; Collect test files
-              (when (name:match "_test%.fnl$")
-                (table.insert tests path))))))
+      ;; Collect and sort directory entries for deterministic ordering
+      (let [entries []]
+        (each [name kind (rb.unix.opendir dir)]
+          (table.insert entries [name kind]))
+        (table.sort entries (fn [a b] (< (. a 1) (. b 1))))
+        (each [_ [name kind] (ipairs entries)]
+          (let [path (.. dir "/" name)]
+            (if (and (= kind 4)
+                     (not (= name "."))
+                     (not (= name "..")))
+                ;; Recursively walk subdirectories
+                (each [_ file (ipairs (walk path))]
+                  (table.insert tests file))
+                ;; Collect test files
+                (when (name:match "_test%.fnl$")
+                  (table.insert tests path)))))))
     tests))
 
 (fn run-test-file [file]
   "Runs tests for a single file and returns a summary table."
-  (let [suite (require (file:gsub "%.fnl$" ""))
-        results {:passed 0 :failed 0 :total 0 :errors [] :groups [] :timings []}]
-    (when (= (type suite) :table)
-      (let [test-tasks
-            (collect [name test-fn (pairs suite)]
-              (let [test-name (if (= (type name) :string) name (tostring name))
-                    test-to-run (if (= (type name) :string) test-fn (. suite name))]
-                (when (and test-to-run (test-name:match "^test-"))
-                  (values
-                    test-name
-                    (future.async
-                      #(let [start-time (get-time-ms)]
-                         ;; Reset state and clear any previous collected tests
-                         (set test.state.groups [])
-                         (set test.state.collected-tests [])
-                         ;; Set current file for error reporting
-                         (set test.state.current-file file)
-                         ;; Run test function to collect testing blocks
-                         (test-to-run)
-                         ;; Execute collected tests in parallel and get results
-                         (let [parallel-results (test.execute-collected-tests)
-                               end-time (get-time-ms)
-                               duration (- end-time start-time)]
-                           {:groups parallel-results :duration duration})))))))]
-        (each [name task (pairs test-tasks)]
-          (set results.total (+ results.total 1))
-          (let [(ok res) (pcall #(task:await))
-                name (name:gsub "^test%-" "")]
-            (let [test-groups (if (and ok (= (type res) :table) res.groups)
-                                  res.groups
-                                  [])
-                  duration (if (and ok (= (type res) :table) res.duration)
-                               res.duration
-                               0)
-                  ;; Check if any group has failures
-                  has-group-failures (accumulate [has-fail false _ group (ipairs test-groups)]
-                                       (or has-fail (> group.failed 0)))]
-              ;; Record timing information
-              (table.insert results.timings
-                {:name name :duration duration :file file})
-              (if (and ok (not has-group-failures))
-                  (do
-                    (set results.passed (+ results.passed 1))
-                    (table.insert results.errors
-                      {:ok true :name name
-                       :groups test-groups :duration duration}))
-                  (do
-                    (set results.failed (+ results.failed 1))
-                    (table.insert results.errors
-                      {:ok false :name name
-                       :reason (if (not ok) res "Test group(s) had assertion failures")
-                       :groups test-groups :duration duration}))))))))
+  (let [results {:passed 0 :failed 0 :total 0 :errors [] :groups [] :timings []}
+        ;; Try to load the test file with better error handling
+        (load-ok suite) (xpcall #(require (file:gsub "%.fnl$" ""))
+                                (fn [err]
+                                  (.. "Failed to load " file ":\n" err)))]
+    (if (not load-ok)
+        ;; Handle load failure gracefully
+        (do
+          (set results.total 1)
+          (set results.failed 1)
+          (table.insert results.errors
+            {:ok false :name (.. file " (load error)")
+             :reason suite :groups [] :duration 0}))
+        ;; Process loaded suite
+        (when (= (type suite) :table)
+          ;; Collect and sort test names for deterministic ordering
+          (let [test-names []]
+            (each [name test-fn (pairs suite)]
+              (let [test-name (if (= (type name) :string) name (tostring name))]
+                (when (and test-fn (test-name:match "^test-"))
+                  (table.insert test-names test-name))))
+            (table.sort test-names)
+            (let [test-tasks
+                  (collect [_ name (ipairs test-names)]
+                    (values
+                      name
+                      (future.async
+                        #(let [start-time (get-time-ms)
+                               test-to-run (. suite name)]
+                           ;; Reset state and clear any previous collected tests
+                           (set test.state.groups [])
+                           (set test.state.collected-tests [])
+                           ;; Set current file for error reporting
+                           (set test.state.current-file file)
+                           ;; Run test function to collect testing blocks
+                           (test-to-run)
+                           ;; Execute collected tests in parallel and get results
+                           (let [parallel-results (test.execute-collected-tests)
+                                 end-time (get-time-ms)
+                                 duration (- end-time start-time)]
+                             {:groups parallel-results :duration duration})))))]
+              ;; Iterate in sorted order for deterministic execution
+              (each [_ name (ipairs test-names)]
+                (let [task (. test-tasks name)]
+                  (set results.total (+ results.total 1))
+                  (let [(ok res) (pcall #(task:await))
+                        name (name:gsub "^test%-" "")]
+                    (let [test-groups (if (and ok (= (type res) :table) res.groups)
+                                          res.groups
+                                          [])
+                          duration (if (and ok (= (type res) :table) res.duration)
+                                       res.duration
+                                       0)
+                          ;; Check if any group has failures
+                          has-group-failures (accumulate [has-fail false _ group (ipairs test-groups)]
+                                               (or has-fail (> group.failed 0)))]
+                      ;; Record timing information
+                      (table.insert results.timings
+                        {:name name :duration duration :file file})
+                      (if (and ok (not has-group-failures))
+                          (do
+                            (set results.passed (+ results.passed 1))
+                            (table.insert results.errors
+                              {:ok true :name name
+                               :groups test-groups :duration duration}))
+                          (do
+                            (set results.failed (+ results.failed 1))
+                            (table.insert results.errors
+                              {:ok false :name name
+                               :reason (if (not ok) res "Test group(s) had assertion failures")
+                               :groups test-groups :duration duration})))))))))))
     results))
 
 (fn organize-test-results [summary-errors]
