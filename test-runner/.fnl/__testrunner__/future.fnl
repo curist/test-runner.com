@@ -188,11 +188,17 @@
       (do
         (let [poll-fds {}
               fd-map {}]
-          ;; Prepare for polling
+          ;; First, extract results from already-resolved futures
           (each [i f (ipairs self.futures)]
-            (tset poll-fds f.read_fd rb.unix.POLLIN)
-            (tset fd-map f.read_fd i))
+            (if (= f.status :resolved)
+                ;; Stash resolved result immediately, skip polling
+                (tset self.results i (f:await))
+                ;; Queue pending futures for polling
+                (do
+                  (tset poll-fds f.read_fd rb.unix.POLLIN)
+                  (tset fd-map f.read_fd i))))
 
+          ;; Poll only if there are pending futures
           (while (not (table-is-empty? poll-fds))
             (let [timeout (if timeout-ms (math.floor timeout-ms) -1)
                   ready-fds (assert (rb.unix.poll poll-fds timeout))]

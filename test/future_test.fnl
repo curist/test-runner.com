@@ -74,12 +74,20 @@
 (fn test-future-combinators []
   (testing "future.all operations"
     #(do
-       ;; Test basic future.all functionality  
+       ;; Test basic future.all functionality
        (let [f1 (future.async #(+ 1 2))
              f2 (future.async #(* 3 4))
              all-f (future.all [f1 f2])
              results (all-f:await)]
          (asserts.deep= [3 12] results))
+
+       ;; Test future.all with mix of resolved and async futures
+       (let [f1 (future.resolve 42)
+             f2 (future.async #(+ 10 20))
+             f3 (future.resolve "hello")
+             all-f (future.all [f1 f2 f3])
+             results (all-f:await)]
+         (asserts.deep= [42 30 "hello"] results))
 
        ;; Test future.all result caching
        (let [f1 (future.async #(+ 1 2))
